@@ -1,0 +1,79 @@
+{
+  "entities": {
+    "Product": {
+      "title": "Product",
+      "description": "Store products",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "imageUrl": { "type": "string" },
+        "category": { "type": "string" },
+        "subcategory": { "type": "string" },
+        "customizable": { "type": "boolean" },
+        "stock": { "type": "number" },
+        "hasNameAndSurname": { "type": "boolean" },
+        "isSuaHistoria": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "price", "imageUrl", "category"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profiles",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "customer"] },
+        "createdAt": { "type": "object" },
+        "lastLogin": { "type": "object" }
+      },
+      "required": ["email", "role"]
+    },
+    "Order": {
+      "title": "Order",
+      "description": "Customer orders",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string" },
+        "items": { "type": "array" },
+        "total": { "type": "number" },
+        "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "items", "total"]
+    },
+    "Settings": {
+      "title": "Settings",
+      "description": "Store-wide settings",
+      "type": "object",
+      "properties": {
+        "whatsapp": { "type": "string" },
+        "instagram": { "type": "string" },
+        "facebook": { "type": "string" },
+        "email": { "type": "string" },
+        "address": { "type": "string" }
+      }
+    }
+  },
+  "firestore": {
+    "products": {
+      "schema": "Product",
+      "description": "Available products for sale"
+    },
+    "users": {
+      "schema": "User",
+      "description": "Registered users"
+    },
+    "orders": {
+      "schema": "Order",
+      "description": "Placed orders"
+    },
+    "settings": {
+      "schema": "Settings",
+      "description": "Global store configuration"
+    }
+  }
+}
