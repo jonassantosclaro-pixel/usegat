@@ -10,7 +10,7 @@ import {
   updateProfile
 } from 'firebase/auth';
 import { auth, db } from './firebase';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
 
 interface UserData {
   uid: string;
@@ -42,6 +42,53 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+enum OperationType {
+  CREATE = 'create',
+  UPDATE = 'update',
+  DELETE = 'delete',
+  LIST = 'list',
+  GET = 'get',
+  WRITE = 'write',
+}
+
+interface FirestoreErrorInfo {
+  error: string;
+  operationType: OperationType;
+  path: string | null;
+  authInfo: {
+    userId?: string | null;
+    email?: string | null;
+    emailVerified?: boolean | null;
+    isAnonymous?: boolean | null;
+    tenantId?: string | null;
+    providerInfo?: {
+      providerId?: string | null;
+      email?: string | null;
+    }[];
+  }
+}
+
+function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const errInfo: FirestoreErrorInfo = {
+    error: error instanceof Error ? error.message : String(error),
+    authInfo: {
+      userId: auth.currentUser?.uid,
+      email: auth.currentUser?.email,
+      emailVerified: auth.currentUser?.emailVerified,
+      isAnonymous: auth.currentUser?.isAnonymous,
+      tenantId: auth.currentUser?.tenantId,
+      providerInfo: auth.currentUser?.providerData?.map(provider => ({
+        providerId: provider.providerId,
+        email: provider.email,
+      })) || []
+    },
+    operationType,
+    path
+  };
+  console.error('Firestore Error: ', JSON.stringify(errInfo));
+  throw new Error(JSON.stringify(errInfo));
+}
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserData | null>(null);
@@ -49,43 +96,68 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+    let unsubscribeUser: (() => void) | undefined;
+
+    const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
       setUser(currentUser);
       
       if (currentUser) {
         const userRef = doc(db, 'users', currentUser.uid);
-        const userSnap = await getDoc(userRef);
-        const isBootstrapAdmin = currentUser.email === 'jonassantosclaro@gmail.com';
         
-        let profile: any = null;
-
-        if (!userSnap.exists()) {
-          const role = isBootstrapAdmin ? 'admin' : 'customer';
-          profile = {
-            uid: currentUser.uid,
-            name: currentUser.displayName,
-            email: currentUser.email,
-            photoURL: currentUser.photoURL,
-            createdAt: serverTimestamp(),
-            lastLogin: serverTimestamp(),
-            role: role
-          };
-          await setDoc(userRef, profile);
-          setIsAdmin(role === 'admin');
-        } else {
-          profile = userSnap.data();
-          let role = profile.role;
+        // Use onSnapshot for real-time user data
+        unsubscribeUser = onSnapshot(userRef, async (docSnap) => {
+          const isBootstrapAdmin = currentUser.email === 'jonassantosclaro@gmail.com';
           
-          if (isBootstrapAdmin && role !== 'admin') {
-            role = 'admin';
-            await setDoc(userRef, { role: 'admin' }, { merge: true });
-          }
+          if (!docSnap.exists()) {
+            const role = isBootstrapAdmin ? 'admin' : 'customer';
+            const profile = {
+              uid: currentUser.uid,
+              name: currentUser.displayName || 'Novo Usuário',
+              email: currentUser.email,
+              photoURL: currentUser.photoURL,
+              createdAt: serverTimestamp(),
+              lastLogin: serverTimestamp(),
+              role: role
+            };
+            try {
+              await setDoc(userRef, profile);
+            } catch (error) {
+              handleFirestoreError(error, OperationType.CREATE, `users/${currentUser.uid}`);
+            }
+            setUserData(profile as UserData);
+            setIsAdmin(role === 'admin');
+          } else {
+            const data = docSnap.data() as UserData;
+            let role = data.role;
+            
+            if (isBootstrapAdmin && role !== 'admin') {
+              role = 'admin';
+              try {
+                await setDoc(userRef, { role: 'admin' }, { merge: true });
+              } catch (error) {
+                handleFirestoreError(error, OperationType.UPDATE, `users/${currentUser.uid}`);
+              }
+            }
 
-          setIsAdmin(role === 'admin');
+            setIsAdmin(role === 'admin');
+            setUserData(data);
+          }
+        }, (error) => {
+          console.error("User data subscription error:", error);
+          if (error.message.includes('permission-denied')) {
+             handleFirestoreError(error, OperationType.GET, `users/${currentUser.uid}`);
+          }
+        });
+
+        // Always update last login
+        try {
           await setDoc(userRef, { lastLogin: serverTimestamp() }, { merge: true });
+        } catch (error) {
+          // Ignore lastLogin update errors during init if it fails
+          console.warn("Failed to update last login", error);
         }
-        setUserData(profile);
       } else {
+        if (unsubscribeUser) unsubscribeUser();
         setUserData(null);
         setIsAdmin(false);
       }
@@ -93,25 +165,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    return () => {
+      unsubscribeAuth();
+      if (unsubscribeUser) unsubscribeUser();
+    };
   }, []);
 
   const signInWithGoogle = async () => {
-    const provider = new GoogleAuthProvider();
-    await signInWithPopup(auth, provider);
+    try {
+      const provider = new GoogleAuthProvider();
+      // Ensure cross-origin setting is correct for popups if possible, 
+      // but usually standard is enough.
+      await signInWithPopup(auth, provider);
+    } catch (error: any) {
+      console.error("Google Login Error:", error);
+      if (error.code === 'auth/popup-blocked') {
+        alert("O bloqueador de pop-ups impediu o login. Por favor, autorize pop-ups para este site ou abra o site em uma nova aba.");
+      } else {
+        alert("Erro ao entrar com Google: " + error.message);
+      }
+    }
   };
 
   const signUpEmail = async (email: string, pass: string, name: string) => {
-    const res = await createUserWithEmailAndPassword(auth, email, pass);
-    await updateProfile(res.user, { displayName: name });
-    const userRef = doc(db, 'users', res.user.uid);
-    await setDoc(userRef, {
-      uid: res.user.uid,
-      name,
-      email,
-      role: 'customer',
-      createdAt: serverTimestamp(),
-    });
+    try {
+      const res = await createUserWithEmailAndPassword(auth, email, pass);
+      await updateProfile(res.user, { displayName: name });
+      // The onSnapshot in our useEffect will handle creating the Firestore document
+      // using the updated displayName.
+    } catch (error: any) {
+      console.error("SignUp error:", error);
+      throw error;
+    }
   };
 
   const signInEmail = async (email: string, pass: string) => {

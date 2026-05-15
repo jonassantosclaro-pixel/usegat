@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { X, ShoppingBag, Trash2, Plus, Minus, ArrowRight, Sparkles } from 'lucide-react';
 import { useCart } from '@/src/lib/CartContext';
 import { formatPrice } from '@/src/lib/utils';
+import { PaymentMethods } from './PaymentMethods';
 import { Link, useNavigate } from 'react-router-dom';
 import { collection, limit, query, getDocs } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
@@ -138,6 +139,8 @@ export default function CartSidebar() {
                     <span className="text-brand-red">{formatPrice(finalTotal)}</span>
                   </div>
                 </div>
+
+                <PaymentMethods total={finalTotal} className="py-2" />
 
                 <div className="space-y-3">
                   <button 

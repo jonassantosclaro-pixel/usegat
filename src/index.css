@@ -1,20 +1,27 @@
-@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800;900&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Quicksand:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,400;0,700;0,900;1,400&display=swap');
 @import "tailwindcss";
 
 @theme {
-  --font-sans: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Quicksand", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Playfair Display", serif;
-  --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
   
-  --color-brand-black: #2C2520;
-  --color-brand-red: #8B4513; 
-  --color-brand-yellow: #D4A373;
-  --color-brand-bg: #FDF9F3;
-  --color-brand-gray: #EAE2D6;
+  --color-brand-primary: #4D1D54;
+  --color-brand-primary-light: #6D3D74;
+  --color-brand-pink-light: #FAF7F8;
+  --color-brand-pink-medium: #F5E6F0;
+  --color-brand-pink-strong: #4D1D54;
+  --color-brand-gold: #B48A4E;
+  --color-brand-gold-dark: #8C6A3B;
+  --color-brand-black: #1A1A1A;
+  --color-brand-gray: #666666;
 }
 
 body {
-  background-color: var(--color-brand-bg);
+  background-image: url('https://i.postimg.cc/pLCQ42xQ/nasceu-no-corac-a-o-da-Cidade-Maravilhosa-atrave-s-do-sonho-de-uma-profissional-da-sau-de-que-busca.png');
+  background-attachment: fixed;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
   color: var(--color-brand-black);
   font-family: var(--font-sans);
 }
@@ -28,16 +35,5 @@ body {
   .animate-scroll {
     animation: scroll 30s linear infinite;
     display: inline-block;
-  }
-  
-  .custom-scrollbar::-webkit-scrollbar {
-    width: 6px;
-  }
-  .custom-scrollbar::-webkit-scrollbar-track {
-    background: transparent;
-  }
-  .custom-scrollbar::-webkit-scrollbar-thumb {
-    background: #D4A373;
-    border-radius: 10px;
   }
 }

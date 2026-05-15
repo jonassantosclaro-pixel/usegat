@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc } from 'firebase/firestore';
-import { db } from '@/src/lib/firebase';
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { useAuth } from '@/src/lib/AuthContext';
 import { Link } from 'react-router-dom';
 import { Plus, Trash2, Edit3, Package, Users, ShoppingCart as OrderIcon, Database } from 'lucide-react';
@@ -33,33 +33,51 @@ export default function AdminDashboard() {
     customizable: false,
     hasNameAndSurname: false,
     isSuaHistoria: false,
+    sku: '',
+    detailedDescription: '',
     stock: 0
   });
 
   useEffect(() => {
-    async function fetchData() {
-      try {
-        const prodSnapshot = await getDocs(collection(db, 'products'));
-        setProducts(prodSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        
-        const orderSnapshot = await getDocs(collection(db, 'orders'));
-        setOrders(orderSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    if (!isAdmin) return;
 
-        const userSnapshot = await getDocs(collection(db, 'users'));
-        setCustomers(userSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    setLoading(true);
 
-        // Fetch Settings
-        const settingsSnap = await getDocs(collection(db, 'settings'));
-        if (!settingsSnap.empty) {
-          setSettings(settingsSnap.docs[0].data() as any);
-        }
-      } catch (error) {
-        console.error("Error fetching admin data:", error);
-      } finally {
-        setLoading(false);
+    // Products Real-time
+    const unsubscribeProducts = onSnapshot(collection(db, 'products'), (snapshot) => {
+      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (error) => {
+      console.error("Products error:", error);
+    });
+
+    // Orders Real-time
+    const unsubscribeOrders = onSnapshot(collection(db, 'orders'), (snapshot) => {
+      setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error("Orders error:", error);
+    });
+
+    // Customers Real-time
+    const unsubscribeCustomers = onSnapshot(collection(db, 'users'), (snapshot) => {
+      setCustomers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error("Customers error:", error);
+    });
+
+    // Settings Real-time
+    const unsubscribeSettings = onSnapshot(collection(db, 'settings'), (snapshot) => {
+      if (!snapshot.empty) {
+        setSettings(snapshot.docs[0].data() as any);
       }
-    }
-    if (isAdmin) fetchData();
+    });
+
+    return () => {
+      unsubscribeProducts();
+      unsubscribeOrders();
+      unsubscribeCustomers();
+      unsubscribeSettings();
+    };
   }, [isAdmin]);
 
   if (authLoading) return (
@@ -105,7 +123,7 @@ export default function AdminDashboard() {
       }
       alert('Configurações salvas!');
     } catch (error) {
-      console.error(error);
+      handleFirestoreError(error, OperationType.WRITE, 'settings');
       alert('Erro ao salvar configurações');
     }
   };
@@ -115,7 +133,7 @@ export default function AdminDashboard() {
       await updateDoc(doc(db, 'orders', orderId), { status });
       setOrders(orders.map(o => o.id === orderId ? { ...o, status } : o));
     } catch (error) {
-      console.error(error);
+      handleFirestoreError(error, OperationType.UPDATE, `orders/${orderId}`);
     }
   };
 
@@ -195,9 +213,9 @@ export default function AdminDashboard() {
       }
       setShowAddModal(false);
       setEditingProduct(null);
-      window.location.reload();
+      // Removed hard reload, using onSnapshot for real-time
     } catch (error) {
-      console.error("Error saving product:", error);
+      handleFirestoreError(error, editingProduct ? OperationType.UPDATE : OperationType.CREATE, `products/${editingProduct?.id || ''}`);
     }
   };
 
@@ -213,6 +231,8 @@ export default function AdminDashboard() {
       customizable: product.customizable || false,
       hasNameAndSurname: product.hasNameAndSurname || false,
       isSuaHistoria: product.isSuaHistoria || false,
+      sku: product.sku || '',
+      detailedDescription: product.detailedDescription || '',
       stock: product.stock || 0
     });
     setShowAddModal(true);
@@ -222,9 +242,8 @@ export default function AdminDashboard() {
     if (confirm('Tem certeza?')) {
       try {
         await deleteDoc(doc(db, 'products', id));
-        setProducts(products.filter(p => p.id !== id));
       } catch (error) {
-        console.error("Error deleting product:", error);
+        handleFirestoreError(error, OperationType.DELETE, `products/${id}`);
       }
     }
   };
@@ -234,46 +253,51 @@ export default function AdminDashboard() {
     
     setLoading(true);
     try {
+      const thermalDescription = "A parede dupla de isolamento mantém suas bebidas favoritas quentes ou frias por mais tempo, ideal para qualquer aventura ou rotina diária. Perfeita para os amantes de design único ou para presentear alguém especial, esta garrafa une o encanto visual à praticidade, tornando cada gole uma experiência estelar.\n\n<img src=\"https://i.postimg.cc/pTMMv8nk/Whats-App-Image-2026-05-15-at-11-51-00.jpg\" alt=\"Detalhes da Garrafa Térmica\" />\n\n<img src=\"https://i.postimg.cc/yYZhgZJg/Whats-App-Image-2026-05-15-at-11-53-27.jpg\" alt=\"Resistência da Garrafa Térmica\" />";
+      
       const seedProducts = [
         // GARRAFAS TÉRMICAS
-        { name: 'Garrafa MEU JEITO', category: 'garrafas-termicas', subcategory: 'MEU JEITO', price: 159.90, customizable: true, isSuaHistoria: true, imageUrl: 'https://images.unsplash.com/photo-1602143393494-721d0030e162?w=800' },
-        { name: 'Garrafa Saúde', category: 'garrafas-termicas', subcategory: 'SAÚDE', price: 129.90, customizable: true, hasNameAndSurname: true, imageUrl: 'https://images.unsplash.com/photo-1590600156903-882269a83533?w=800' },
-        { name: 'Garrafa Engenharia', category: 'garrafas-termicas', subcategory: 'ENGENHARIA', price: 129.90, customizable: true, hasNameAndSurname: true, imageUrl: 'https://images.unsplash.com/photo-1602143393494-721d0030e162?w=800' },
-        { name: 'Garrafa Docência', category: 'garrafas-termicas', subcategory: 'DOCÊNCIA', price: 129.90, customizable: true, hasNameAndSurname: true, imageUrl: 'https://images.unsplash.com/photo-1590600156903-882269a83533?w=800' },
-        { name: 'Garrafa Advocacia', category: 'garrafas-termicas', subcategory: 'ADVOCACIA', price: 129.90, customizable: true, hasNameAndSurname: true, imageUrl: 'https://images.unsplash.com/photo-1602143393494-721d0030e162?w=800' },
-        { name: 'Garrafa Contador e ADM', category: 'garrafas-termicas', subcategory: 'CONTADOR e ADM', price: 129.90, customizable: true, hasNameAndSurname: true, imageUrl: 'https://images.unsplash.com/photo-1590600156903-882269a83533?w=800' },
-        { name: 'Garrafa Militar / Polícia', category: 'garrafas-termicas', subcategory: 'MILITAR / POLÍCIA', price: 129.90, customizable: true, hasNameAndSurname: true, imageUrl: 'https://images.unsplash.com/photo-1602143393494-721d0030e162?w=800' },
-        { name: 'Garrafa TI', category: 'garrafas-termicas', subcategory: 'TI', price: 129.90, customizable: true, hasNameAndSurname: true, imageUrl: 'https://images.unsplash.com/photo-1590600156903-882269a83533?w=800' },
+        { name: 'Garrafa MEU JEITO', category: 'garrafas-termicas', subcategory: 'MEU JEITO', sku: 'GT-MEU-JEITO', price: 159.90, customizable: true, isSuaHistoria: true, imageUrl: 'https://images.unsplash.com/photo-1602143393494-721d0030e162?w=800', detailedDescription: thermalDescription },
+        { name: 'Garrafa Saúde', category: 'garrafas-termicas', subcategory: 'SAÚDE', sku: 'GT-SAUDE', price: 129.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1590600156903-882269a83533?w=800', detailedDescription: thermalDescription },
+        { name: 'Garrafa Engenharia', category: 'garrafas-termicas', subcategory: 'ENGENHARIA', sku: 'GT-ENG', price: 129.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1602143393494-721d0030e162?w=800', detailedDescription: thermalDescription },
+        { name: 'Garrafa Docência', category: 'garrafas-termicas', subcategory: 'DOCÊNCIA', sku: 'GT-DOC', price: 129.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1590600156903-882269a83533?w=800', detailedDescription: thermalDescription },
+        { name: 'Garrafa Advocacia', category: 'garrafas-termicas', subcategory: 'ADVOCACIA', sku: 'GT-ADV', price: 129.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1602143393494-721d0030e162?w=800', detailedDescription: thermalDescription },
+        { name: 'Garrafa Contador e ADM', category: 'garrafas-termicas', subcategory: 'CONTADOR e ADM', sku: 'GT-ADM', price: 129.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1590600156903-882269a83533?w=800', detailedDescription: thermalDescription },
+        { name: 'Garrafa Militar / Polícia', category: 'garrafas-termicas', subcategory: 'MILITAR / POLÍCIA', sku: 'GT-MIL', price: 129.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1602143393494-721d0030e162?w=800', detailedDescription: thermalDescription },
+        { name: 'Garrafa TI', category: 'garrafas-termicas', subcategory: 'TI', sku: 'GT-TI', price: 129.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1590600156903-882269a83533?w=800', detailedDescription: thermalDescription },
         
         // CANECAS
-        { name: 'Caneca Caricatura Cartoon', category: 'canecas', subcategory: 'CARICATURAS', price: 69.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
-        { name: 'Caneca Caricatura Charge', category: 'canecas', subcategory: 'CARICATURAS', price: 69.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
-        { name: 'Caneca Caricatura em Linhas', category: 'canecas', subcategory: 'CARICATURAS', price: 59.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
-        { name: 'Caneca Caricatura em Flat', category: 'canecas', subcategory: 'CARICATURAS', price: 64.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
-        { name: 'Caneca Logomarca', category: 'canecas', subcategory: 'CARICATURAS', price: 49.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
+        { name: 'Caneca Caricatura Cartoon', category: 'canecas', subcategory: 'CARICATURAS', sku: 'CN-CART', price: 69.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
+        { name: 'Caneca Caricatura Charge', category: 'canecas', subcategory: 'CARICATURAS', sku: 'CN-CHRG', price: 69.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
+        { name: 'Caneca Caricatura em Linhas', category: 'canecas', subcategory: 'CARICATURAS', sku: 'CN-LINE', price: 59.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
+        { name: 'Caneca Caricatura em Flat', category: 'canecas', subcategory: 'CARICATURAS', sku: 'CN-FLAT', price: 64.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
+        { name: 'Caneca Logo marca', category: 'canecas', subcategory: 'CARICATURAS', sku: 'CN-LOGO', price: 49.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
 
-        // ATACADO
-        { name: 'Atacado Logo (Térmica)', category: 'atacado', subcategory: 'GARRAFAS TÉRMICAS', price: 89.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1602143393494-721d0030e162?w=800', description: 'Mínimo 10 unidades' },
-        { name: 'Atacado Caricatura + Logo (Térmica)', category: 'atacado', subcategory: 'GARRAFAS TÉRMICAS', price: 109.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1590600156903-882269a83533?w=800', description: 'Mínimo 10 unidades' },
-        { name: 'Atacado Logo (Não Térmica)', category: 'atacado', subcategory: 'GARRAFAS NÃO TÉRMICAS', price: 45.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
-        { name: 'Atacado Caricatura + Logo (Não Térmica)', category: 'atacado', subcategory: 'GARRAFAS NÃO TÉRMICAS', price: 65.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
-        { name: 'Atacado Logo (Canecas)', category: 'atacado', subcategory: 'CANECAS', price: 29.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
-        { name: 'Atacado Caricatura + Logo (Canecas)', category: 'atacado', subcategory: 'CANECAS', price: 49.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' }
+        // ATACADO - GARRAFAS TÉRMICAS
+        { name: 'Atacado Logo de empresa ou evento (Térmica)', category: 'atacado', subcategory: 'GARRAFAS TÉRMICAS', price: 89.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1602143393494-721d0030e162?w=800' },
+        { name: 'Atacado Caricatura + Logo (Térmica)', category: 'atacado', subcategory: 'GARRAFAS TÉRMICAS', price: 109.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1590600156903-882269a83533?w=800' },
+
+        // ATACADO - GARRAFAS NÃO TÉRMICAS
+        { name: 'Atacado Logo de empresa ou evento (Não Térmica)', category: 'atacado', subcategory: 'GARRAFAS NÃO TÉRMICAS', price: 45.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
+        { name: 'Atacado Caricatura + logo (Não Térmica)', category: 'atacado', subcategory: 'GARRAFAS NÃO TÉRMICAS', price: 65.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
+
+        // ATACADO - CANECAS
+        { name: 'Atacado Logo de empresa ou evento (Canecas)', category: 'atacado', subcategory: 'CANECAS', price: 29.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' },
+        { name: 'Atacado Caricatura + logo (Canecas)', category: 'atacado', subcategory: 'CANECAS', price: 49.90, customizable: true, imageUrl: 'https://images.unsplash.com/photo-1514228742587-6b1558fcca3d?w=800' }
       ];
 
       for (const prod of seedProducts) {
         await addDoc(collection(db, 'products'), {
           ...prod,
-          description: prod.description || 'Produto oficial USE GAT pre-configurado.',
+          description: (prod as any).description || 'Produto oficial USE.GAT pré-configurado.',
           stock: 99,
           createdAt: new Date().toISOString()
         });
       }
 
       alert('Dados semeados com sucesso!');
-      window.location.reload();
     } catch (error) {
-      console.error(error);
+      handleFirestoreError(error, OperationType.CREATE, 'products');
       alert('Erro ao semear dados.');
     } finally {
       setLoading(false);
@@ -284,48 +308,39 @@ export default function AdminDashboard() {
     <div className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
         <div>
-          <h1 className="text-4xl font-black tracking-tighter uppercase mb-2">Painel de Controle</h1>
-          <div className="flex gap-4 mt-4">
-            <button 
-              onClick={() => setActiveTab('products')}
-              className={`text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full transition-all ${activeTab === 'products' ? 'bg-brand-black text-white' : 'bg-brand-gray text-gray-400 hover:text-brand-black'}`}
-            >
-              Produtos
-            </button>
-            <button 
-              onClick={() => setActiveTab('orders')}
-              className={`text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full transition-all ${activeTab === 'orders' ? 'bg-brand-black text-white' : 'bg-brand-gray text-gray-400 hover:text-brand-black'}`}
-            >
-              Pedidos ({orders.length})
-            </button>
-            <button 
-              onClick={() => setActiveTab('customers')}
-              className={`text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full transition-all ${activeTab === 'customers' ? 'bg-brand-black text-white' : 'bg-brand-gray text-gray-400 hover:text-brand-black'}`}
-            >
-              Clientes ({customers.length})
-            </button>
-            <button 
-              onClick={() => setActiveTab('settings')}
-              className={`text-xs font-black uppercase tracking-widest px-4 py-2 rounded-full transition-all ${activeTab === 'settings' ? 'bg-brand-black text-white' : 'bg-brand-gray text-gray-400 hover:text-brand-black'}`}
-            >
-              Configurações
-            </button>
+          <h1 className="text-4xl font-serif font-black tracking-tight text-brand-black mb-2">Painel de Controle</h1>
+          <div className="flex gap-4 mt-6">
+            {[
+              { id: 'products', label: 'Produtos', icon: Package },
+              { id: 'orders', label: `Pedidos (${orders.length})`, icon: OrderIcon },
+              { id: 'customers', label: `Clientes (${customers.length})`, icon: Users },
+              { id: 'settings', label: 'Configurações', icon: Database },
+            ].map((tab) => (
+              <button 
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`text-[10px] font-black uppercase tracking-[0.2em] px-6 py-3 rounded-xl transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-brand-pink-strong text-white shadow-md' : 'bg-white text-brand-gray border border-brand-pink-light hover:bg-[#FAF7F8]'}`}
+              >
+                <tab.icon className="w-3 h-3" />
+                {tab.label}
+              </button>
+            ))}
           </div>
         </div>
         {activeTab === 'products' && (
           <div className="flex gap-4">
             <button 
               onClick={handleSeedData}
-              className="bg-brand-gray text-brand-black px-6 py-4 rounded-full font-black uppercase tracking-widest text-xs hover:bg-brand-yellow transition-all flex items-center gap-2 border-2 border-brand-black/5"
+              className="bg-white text-brand-gray px-6 py-4 rounded-full font-black uppercase tracking-widest text-[9px] hover:bg-[#FAF7F8] transition-all flex items-center gap-2 border border-brand-pink-light"
             >
-              <Database className="w-4 h-4" />
+              <Database className="w-3 h-3" />
               Resetar Categorias
             </button>
             <button 
               onClick={() => setShowAddModal(true)}
-              className="bg-brand-red text-white px-8 py-4 rounded-full font-black uppercase tracking-widest text-sm hover:scale-105 transition-transform flex items-center shadow-xl shadow-brand-red/20"
+              className="bg-brand-gold text-white px-8 py-4 rounded-full font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-transform flex items-center shadow-lg"
             >
-              <Plus className="w-5 h-5 mr-3" />
+              <Plus className="w-4 h-4 mr-3" />
               Novo Produto
             </button>
           </div>
@@ -333,49 +348,50 @@ export default function AdminDashboard() {
       </div>
 
       {activeTab === 'products' ? (
-        <div className="bg-white rounded-[40px] p-8 shadow-sm border-4 border-brand-gray">
-          <h2 className="text-2xl font-black mb-8 uppercase tracking-tight">Gerenciar Produtos</h2>
+        <div className="bg-white rounded-[40px] p-8 shadow-sm border border-brand-pink-light">
+          <h2 className="text-xl font-serif font-black mb-8 text-brand-black italic">Gerenciar Produtos</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b-4 border-brand-gray pb-4">
-                  <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Imagem</th>
-                  <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Produto</th>
-                  <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Cat/Sub</th>
-                  <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Estoque</th>
-                  <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Preço</th>
-                  <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400 text-right">Ações</th>
+                <tr className="border-b border-brand-pink-light pb-4">
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Imagem</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Produto</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">SKU</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Categoria</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Estoque</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Preço</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium text-right">Ações</th>
                 </tr>
               </thead>
-              <tbody className="divide-y-2 divide-brand-gray">
+              <tbody className="divide-y divide-brand-pink-light/30">
                 {products.map((p) => (
-                  <tr key={p.id} className="group hover:bg-brand-bg transition-colors">
-                    <td className="py-4">
-                      <img src={p.imageUrl} alt={p.name} className="w-12 h-12 object-cover rounded-xl" />
+                  <tr key={p.id} className="group hover:bg-[#FAF7F8] transition-colors">
+                    <td className="py-6">
+                      <img src={p.imageUrl} alt={p.name} className="w-12 h-12 object-contain rounded-xl bg-white border border-brand-pink-light" />
                     </td>
-                    <td className="py-4">
-                      <p className="font-extrabold">{p.name}</p>
-                      {p.customizable && <span className="bg-green-100 text-green-600 px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-widest">Custom</span>}
+                    <td className="py-6">
+                      <p className="font-bold text-sm text-brand-black">{p.name}</p>
+                      {p.customizable && <span className="text-[7px] font-black uppercase tracking-widest text-brand-pink-strong mt-1 block">Personalizável</span>}
                     </td>
-                    <td className="py-4">
+                    <td className="py-6">
+                      <span className="text-[10px] font-mono font-black text-brand-primary">{p.sku || '-'}</span>
+                    </td>
+                    <td className="py-6">
                       <div className="flex flex-col">
-                        <span className="text-[10px] font-black uppercase tracking-widest text-brand-red">{p.category}</span>
-                        <span className="text-[10px] font-bold text-gray-400 uppercase">{p.subcategory || '-'}</span>
+                        <span className="text-[9px] font-black uppercase tracking-widest text-brand-gold">{p.category}</span>
+                        <span className="text-[8px] font-bold text-brand-gray uppercase opacity-60 tracking-wider">{p.subcategory || '-'}</span>
                       </div>
                     </td>
-                    <td className="py-4">
-                      <div className="flex items-center gap-2">
-                        <span className={`font-black text-sm ${p.stock <= 5 ? 'text-brand-red' : 'text-brand-black'}`}>
-                          {p.stock || 0}
-                        </span>
-                        {p.stock <= 5 && <span className="text-[8px] font-bold text-brand-red uppercase animate-pulse">Baixo</span>}
-                      </div>
+                    <td className="py-6">
+                      <span className={`text-xs font-black ${p.stock <= 5 ? 'text-brand-pink-strong' : 'text-brand-gray'}`}>
+                        {p.stock || 0}
+                      </span>
                     </td>
-                    <td className="py-4 font-black text-brand-black">{formatPrice(p.price)}</td>
-                    <td className="py-4 text-right">
-                      <div className="flex justify-end gap-2">
-                        <button onClick={() => handleEdit(p)} className="p-2 hover:text-brand-yellow transition-colors"><Edit3 className="w-5 h-5" /></button>
-                        <button onClick={() => handleDelete(p.id)} className="p-2 hover:text-brand-red transition-colors"><Trash2 className="w-5 h-5" /></button>
+                    <td className="py-6 font-black text-xs text-brand-black">{formatPrice(p.price)}</td>
+                    <td className="py-6 text-right">
+                      <div className="flex justify-end gap-3">
+                        <button onClick={() => handleEdit(p)} className="p-2 text-brand-pink-medium hover:text-brand-gold transition-colors"><Edit3 className="w-4 h-4" /></button>
+                        <button onClick={() => handleDelete(p.id)} className="p-2 text-brand-pink-medium hover:text-brand-pink-strong transition-colors"><Trash2 className="w-4 h-4" /></button>
                       </div>
                     </td>
                   </tr>
@@ -385,18 +401,20 @@ export default function AdminDashboard() {
           </div>
         </div>
       ) : activeTab === 'orders' ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           {orders.map((order) => (
-            <div key={order.id} className="bg-white rounded-[40px] p-8 shadow-sm border-4 border-brand-gray">
-              <div className="flex justify-between items-start mb-6">
+            <div key={order.id} className="bg-white rounded-[40px] p-8 shadow-sm border border-brand-pink-light relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-24 h-24 bg-brand-pink-light/20 rounded-full -mr-12 -mt-12"></div>
+              
+              <div className="flex justify-between items-start mb-8 relative z-10">
                 <div>
-                  <h3 className="font-black text-xl uppercase tracking-tighter">Pedido #{order.id.slice(-6)}</h3>
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{new Date(order.createdAt).toLocaleString('pt-BR')}</p>
+                  <h3 className="font-serif font-black text-lg text-brand-black italic">Pedido #{order.id.slice(-6)}</h3>
+                  <p className="text-[9px] font-bold text-brand-gray uppercase tracking-widest mt-1">{new Date(order.createdAt).toLocaleString('pt-BR')}</p>
                 </div>
                 <select 
                   value={order.status || 'PENDENTE'}
                   onChange={(e) => updateOrderStatus(order.id, e.target.value)}
-                  className="bg-brand-yellow px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest outline-none cursor-pointer"
+                  className="bg-brand-pink-light text-brand-pink-strong px-4 py-2 rounded-full text-[9px] font-black uppercase tracking-widest outline-none cursor-pointer border border-brand-pink-medium/20"
                 >
                   <option value="PENDENTE">PENDENTE</option>
                   <option value="PRODUÇÃO">PRODUÇÃO</option>
@@ -406,77 +424,51 @@ export default function AdminDashboard() {
                 </select>
               </div>
 
-              <div className="space-y-4 mb-6">
+              <div className="space-y-4 mb-8">
                 {order.items?.map((item: any, idx: number) => (
-                  <div key={idx} className="flex items-center gap-4 bg-brand-gray/30 p-4 rounded-3xl">
-                    {item.customization?.preview ? (
-                      <div className="w-16 h-16 bg-white rounded-xl overflow-hidden border-2 border-brand-yellow">
-                        <img src={item.customization.preview} alt="Custom" className="w-full h-full object-contain" />
-                      </div>
-                    ) : (
-                      <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-cover rounded-xl" />
-                    )}
-                    <div>
-                      <p className="font-black text-sm">{item.name}</p>
-                      <p className="text-xs font-bold text-gray-400">{item.quantity}x {formatPrice(item.price)}</p>
-                      {item.customization && (
-                        <div className="mt-1 space-y-0.5">
-                          {item.customization.nome && (
-                            <p className="text-[10px] font-black uppercase text-brand-red">Nome: {item.customization.nome}</p>
-                          )}
-                          {item.customization.sobrenome && (
-                            <p className="text-[10px] font-black uppercase text-brand-red">Sobrenome: {item.customization.sobrenome}</p>
-                          )}
-                          {item.customization.preview && (
-                            <button 
-                              onClick={() => setSelectedOrder({ ...order, currentItem: item })}
-                              className="text-[8px] font-black uppercase text-gray-400 hover:underline"
-                            >
-                              Ver Preview Completo
-                            </button>
-                          )}
-                        </div>
-                      )}
+                  <div key={idx} className="flex items-center gap-4 bg-[#FAF7F8] p-4 rounded-3xl border border-brand-pink-light/30">
+                    <img src={item.imageUrl} alt={item.name} className="w-16 h-16 object-contain bg-white rounded-xl border border-brand-pink-light p-2" />
+                    <div className="flex-1">
+                      <p className="font-bold text-xs text-brand-black">{item.name}</p>
+                      <p className="text-[9px] font-bold text-brand-gray uppercase mt-1">{item.quantity}x {formatPrice(item.price)}</p>
                     </div>
                   </div>
                 ))}
               </div>
 
-              <div className="flex justify-between items-center pt-6 border-t border-brand-gray mb-6">
-                <span className="text-[10px] font-black uppercase tracking-widest text-gray-400">Total</span>
-                <span className="text-2xl font-black">{formatPrice(order.total)}</span>
+              <div className="flex justify-between items-center py-6 border-y border-brand-pink-light/30 mb-8">
+                <span className="text-[9px] font-black uppercase tracking-widest text-brand-gray">Valor Total</span>
+                <span className="text-xl font-serif font-black text-brand-pink-strong">{formatPrice(order.total)}</span>
               </div>
 
               {/* Bling & Melhor Envio Integration */}
-              <div className="grid grid-cols-2 gap-4 mt-6 pt-6 border-t border-brand-gray">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Bling (ERP/Nota)</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-brand-gold">Bling (Nota Fiscal)</p>
                   {order.bling_nfe_number ? (
-                    <div className="bg-green-50 p-3 rounded-2xl border-2 border-green-100">
-                      <p className="text-[10px] font-black text-green-700 uppercase">Nota Emitida: {order.bling_nfe_number}</p>
-                      <button className="text-[8px] font-bold text-green-600 underline uppercase mt-1">Ver XML/PDF</button>
+                    <div className="bg-[#E8F5E9] p-4 rounded-2xl border border-green-200">
+                      <p className="text-[9px] font-black text-green-700 uppercase">Nota: {order.bling_nfe_number}</p>
                     </div>
                   ) : (
                     <button 
                       onClick={() => generateNFe(order.id)}
-                      className="w-full bg-brand-gray text-[10px] font-black uppercase tracking-widest py-3 rounded-xl hover:bg-brand-black hover:text-white transition-all"
+                      className="w-full bg-[#FAF7F8] text-[9px] font-black uppercase tracking-[0.2em] py-3 rounded-xl hover:bg-brand-pink-strong hover:text-white transition-all border border-brand-pink-light"
                     >
-                      Gerar Nota Fiscal
+                      Emitir Nota
                     </button>
                   )}
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-gray-400">Melhor Envio (Frete)</p>
+                  <p className="text-[9px] font-black uppercase tracking-widest text-brand-gold">Melhor Envio (Etiqueta)</p>
                   {order.melhorenvio_label_id ? (
-                    <div className="bg-blue-50 p-3 rounded-2xl border-2 border-blue-100">
-                      <p className="text-[10px] font-black text-blue-700 uppercase">Rastreio: {order.melhorenvio_tracking_code}</p>
-                      <button className="text-[8px] font-bold text-blue-600 underline uppercase mt-1">Imprimir Etiqueta</button>
+                    <div className="bg-[#E3F2FD] p-4 rounded-2xl border border-blue-200">
+                      <p className="text-[9px] font-black text-blue-700 uppercase">Rastreio: {order.melhorenvio_tracking_code || 'Gerado'}</p>
                     </div>
                   ) : (
                     <button 
                       onClick={() => generateLabel(order.id)}
-                      className="w-full bg-brand-gray text-[10px] font-black uppercase tracking-widest py-3 rounded-xl hover:bg-brand-black hover:text-white transition-all"
+                      className="w-full bg-[#FAF7F8] text-[9px] font-black uppercase tracking-[0.2em] py-3 rounded-xl hover:bg-brand-gold hover:text-white transition-all border border-brand-pink-light"
                     >
                       Gerar Etiqueta
                     </button>
@@ -487,85 +479,76 @@ export default function AdminDashboard() {
           ))}
         </div>
       ) : activeTab === 'settings' ? (
-        <div className="bg-white rounded-[40px] p-8 shadow-sm border-4 border-brand-gray max-w-2xl">
-          <h2 className="text-2xl font-black mb-8 uppercase tracking-tight">Configurações da Loja</h2>
+        <div className="bg-white rounded-[40px] p-8 shadow-sm border border-brand-pink-light max-w-2xl">
+          <h2 className="text-xl font-serif font-black mb-8 text-brand-black italic">Configurações Gerais</h2>
           <form onSubmit={handleSaveSettings} className="space-y-6">
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">WhatsApp (com DDD)</label>
-              <input 
-                className="w-full bg-brand-gray rounded-2xl p-4 font-bold outline-none"
-                value={settings.whatsapp}
-                onChange={(e) => setSettings({...settings, whatsapp: e.target.value})}
-                placeholder="Ex: 5511999999999"
-              />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {[
+                { label: 'WhatsApp', field: 'whatsapp', placeholder: '5511999999999' },
+                { label: 'Instagram', field: 'instagram', placeholder: 'use.gat' },
+                { label: 'Telefone', field: 'phone', placeholder: '(11) 99999-9999' },
+                { label: 'E-mail', field: 'email', placeholder: 'contato@usegat.com.br' },
+              ].map((item) => (
+                <div key={item.field}>
+                  <label className="text-[9px] font-black uppercase tracking-widest text-brand-gold mb-2 block">{item.label}</label>
+                  <input 
+                    className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl p-4 text-xs font-bold outline-none focus:border-brand-gold transition-all"
+                    value={(settings as any)[item.field] || ''}
+                    onChange={(e) => setSettings({...settings, [item.field]: e.target.value})}
+                    placeholder={item.placeholder}
+                  />
+                </div>
+              ))}
             </div>
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">Instagram (@)</label>
-              <input 
-                className="w-full bg-brand-gray rounded-2xl p-4 font-bold outline-none"
-                value={settings.instagram}
-                onChange={(e) => setSettings({...settings, instagram: e.target.value})}
-                placeholder="Ex: use.gat"
-              />
-            </div>
-            <div>
-              <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">E-mail de Contato</label>
-              <input 
-                className="w-full bg-brand-gray rounded-2xl p-4 font-bold outline-none"
-                value={settings.email}
-                onChange={(e) => setSettings({...settings, email: e.target.value})}
-                placeholder="Ex: contato@usegat.com.br"
-              />
-            </div>
-            <button type="submit" className="w-full bg-brand-black text-white py-4 rounded-full font-black uppercase tracking-widest shadow-xl">Salvar Alterações</button>
+            <button type="submit" className="w-full bg-brand-gold text-white py-5 rounded-full font-black uppercase tracking-widest text-[10px] shadow-lg hover:bg-brand-gold-dark transition-all">Salvar Alterações</button>
           </form>
 
-          {/* Bling Integration Section */}
-          <div className="mt-12 pt-8 border-t-4 border-brand-gray">
-            <h3 className="text-sm font-black uppercase tracking-widest mb-4 flex items-center gap-2">
+          <div className="mt-16 pt-12 border-t border-brand-pink-light">
+            <h3 className="text-xs font-black uppercase tracking-widest mb-6 flex items-center gap-2 text-brand-pink-strong">
               <Database className="w-4 h-4" />
-              Integração Bling V3 (OAuth)
+              Integrações (Bling V3)
             </h3>
-            <p className="text-[10px] text-gray-400 font-bold uppercase mb-6 leading-relaxed">
-              O Bling mudou para o protocolo OAuth2 (v3). Use o botão abaixo para finalizar a vinculação com a conta Use GAT utilizando os códigos fornecidos.
-            </p>
-            <button 
-              type="button"
-              onClick={exchangeBlingCode}
-              className="bg-brand-yellow text-brand-black px-6 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] hover:bg-brand-black hover:text-white transition-all shadow-lg"
-            >
-              Ativar Integração Bling v3
-            </button>
-            <div className="mt-4 p-4 bg-brand-gray/30 rounded-2xl">
-               <p className="text-[8px] font-bold text-gray-400 uppercase">Status do Token</p>
-               <p className="text-[10px] font-black text-brand-red uppercase mt-1">Vínculo Pendente / Manual</p>
+            <div className="bg-[#FAF7F8] p-8 rounded-[30px] border border-brand-pink-light">
+              <p className="text-[10px] font-bold text-brand-gray uppercase mb-6 leading-relaxed">
+                Utilize os dados de acesso fornecidos para ativar o envio automático de notas fiscais.
+                Configure o Redirect URI como <code className="bg-white px-2 py-1 rounded select-all font-mono">https://usegat.com</code> no painel do Bling.
+              </p>
+              <button 
+                type="button"
+                onClick={exchangeBlingCode}
+                className="bg-white text-brand-pink-strong border border-brand-pink-medium px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[9px] hover:bg-brand-pink-strong hover:text-white transition-all shadow-sm"
+              >
+                Vincular Conta Bling V3
+              </button>
             </div>
           </div>
         </div>
       ) : (
         /* Customers Tab */
-        <div className="bg-white rounded-[40px] p-8 shadow-sm border-4 border-brand-gray">
-          <h2 className="text-2xl font-black mb-8 uppercase tracking-tight">Base de Clientes</h2>
+        <div className="bg-white rounded-[40px] p-8 shadow-sm border border-brand-pink-light">
+          <h2 className="text-xl font-serif font-black mb-8 text-brand-black italic">Nossa Família (Clientes)</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b-4 border-brand-gray pb-4">
-                  <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Avatar</th>
-                  <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Cliente</th>
-                  <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400">E-mail</th>
-                  <th className="pb-4 text-[10px] font-black uppercase tracking-widest text-gray-400">Cadastro</th>
+                <tr className="border-b border-brand-pink-light pb-4">
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Perfil</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Nome</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">E-mail</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Registrado em</th>
                 </tr>
               </thead>
-              <tbody className="divide-y-2 divide-brand-gray">
+              <tbody className="divide-y divide-brand-pink-light/30">
                 {customers.map((c) => (
-                  <tr key={c.id} className="group hover:bg-brand-bg transition-colors">
-                    <td className="py-4">
-                      <img src={c.photoURL || ''} className="w-10 h-10 rounded-full border-2 border-brand-yellow" alt="" />
+                  <tr key={c.id} className="group hover:bg-[#FAF7F8] transition-colors">
+                    <td className="py-6">
+                      <div className="w-10 h-10 rounded-full border border-brand-pink-light flex items-center justify-center bg-[#FAF7F8] overflow-hidden">
+                        {c.photoURL ? <img src={c.photoURL} alt="" /> : <Users className="w-4 h-4 text-brand-pink-medium" />}
+                      </div>
                     </td>
-                    <td className="py-4 font-extrabold uppercase italic">{c.name}</td>
-                    <td className="py-4 font-bold text-gray-500">{c.email}</td>
-                    <td className="py-4 font-black text-[10px] uppercase text-brand-red">
-                      {c.createdAt?.toDate ? c.createdAt.toDate().toLocaleDateString('pt-BR') : 'Sem data'}
+                    <td className="py-6 font-bold text-sm text-brand-black uppercase tracking-tight">{c.name}</td>
+                    <td className="py-6 text-xs text-brand-gray font-medium">{c.email}</td>
+                    <td className="py-6 text-[9px] font-black uppercase tracking-widest text-brand-gold">
+                      {c.createdAt?.toDate ? c.createdAt.toDate().toLocaleDateString('pt-BR') : 'Recentemente'}
                     </td>
                   </tr>
                 ))}
@@ -654,11 +637,30 @@ export default function AdminDashboard() {
                 />
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">Descrição</label>
+                <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">SKU (Stock Keeping Unit) - Obrigatório para Bling</label>
+                <input 
+                  required
+                  className="w-full bg-brand-gray rounded-2xl p-4 font-bold outline-none"
+                  placeholder="Ex: GAT-TERM-001"
+                  value={newProduct.sku}
+                  onChange={(e) => setNewProduct({...newProduct, sku: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">Descrição Curta</label>
                 <textarea 
                   className="w-full bg-brand-gray rounded-2xl p-4 font-bold outline-none h-24 resize-none"
                   value={newProduct.description}
                   onChange={(e) => setNewProduct({...newProduct, description: e.target.value})}
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">Descrição Detalhada do Produto (Pode conter links de imagem)</label>
+                <textarea 
+                  className="w-full bg-brand-gray rounded-2xl p-4 font-bold outline-none h-32 resize-none"
+                  placeholder="Descreva o produto em detalhes aqui..."
+                  value={newProduct.detailedDescription}
+                  onChange={(e) => setNewProduct({...newProduct, detailedDescription: e.target.value})}
                 />
               </div>
               <div className="grid grid-cols-2 gap-6">

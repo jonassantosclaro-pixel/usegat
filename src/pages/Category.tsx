@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { collection, query, where, getDocs, limit } from 'firebase/firestore';
+import { collection, query, where, getDocs, limit, onSnapshot } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { formatPrice } from '@/src/lib/utils';
 import { ShoppingBag, ChevronLeft } from 'lucide-react';
@@ -12,24 +12,20 @@ export default function Category() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchProducts() {
-      setLoading(true);
-      try {
-        const q = id === 'novidades' 
-          ? query(collection(db, 'products'), limit(20))
-          : query(collection(db, 'products'), where('category', '==', id));
-          
-        const querySnapshot = await getDocs(q);
-        const fetchedProducts = querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    setLoading(true);
+    const q = id === 'novidades' 
+      ? query(collection(db, 'products'), limit(20))
+      : query(collection(db, 'products'), where('category', '==', id));
+      
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setProducts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching category products:", error);
+      setLoading(false);
+    });
 
-        setProducts(fetchedProducts);
-      } catch (error) {
-        console.error("Error fetching category products:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-    fetchProducts();
+    return () => unsubscribe();
   }, [id]);
 
   return (
@@ -61,7 +57,7 @@ export default function Category() {
               className="group"
             >
               <Link to={product.customizable ? `/customizar/${product.id}` : `/produto/${product.id}`}>
-                <div className="bg-brand-gray rounded-[40px] p-6 mb-6 aspect-square flex justify-center items-center overflow-hidden border-4 border-transparent group-hover:border-brand-red transition-all shadow-sm relative">
+                <div className="bg-white/40 backdrop-blur-md rounded-[40px] p-6 mb-6 aspect-square flex justify-center items-center overflow-hidden border border-brand-pink-light/30 group-hover:border-brand-primary transition-all shadow-sm relative">
                   <img 
                     src={product.imageUrl} 
                     alt={product.name}

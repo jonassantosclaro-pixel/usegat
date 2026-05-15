@@ -2,7 +2,7 @@
   "entities": {
     "Product": {
       "title": "Product",
-      "description": "Store products",
+      "description": "Store products for the shop",
       "type": "object",
       "properties": {
         "name": { "type": "string" },
@@ -12,25 +12,14 @@
         "category": { "type": "string" },
         "subcategory": { "type": "string" },
         "customizable": { "type": "boolean" },
-        "stock": { "type": "number" },
         "hasNameAndSurname": { "type": "boolean" },
         "isSuaHistoria": { "type": "boolean" },
+        "sku": { "type": "string" },
+        "detailedDescription": { "type": "string" },
+        "stock": { "type": "number" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["name", "price", "imageUrl", "category"]
-    },
-    "User": {
-      "title": "User",
-      "description": "User profiles",
-      "type": "object",
-      "properties": {
-        "name": { "type": "string" },
-        "email": { "type": "string" },
-        "role": { "type": "string", "enum": ["admin", "customer"] },
-        "createdAt": { "type": "object" },
-        "lastLogin": { "type": "object" }
-      },
-      "required": ["email", "role"]
+      "required": ["name", "price", "category", "imageUrl"]
     },
     "Order": {
       "title": "Order",
@@ -41,39 +30,59 @@
         "items": { "type": "array" },
         "total": { "type": "number" },
         "status": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "shippingInfo": { "type": "object" },
+        "paymentInfo": { "type": "object" },
+        "bling_nfe_number": { "type": "string" },
+        "melhorenvio_label_id": { "type": "string" },
+        "melhorenvio_tracking_code": { "type": "string" }
+      },
+      "required": ["userId", "items", "total", "status", "createdAt"]
+    },
+    "User": {
+      "title": "User",
+      "description": "User profiles",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "email": { "type": "string" },
+        "photoURL": { "type": "string" },
+        "isAdmin": { "type": "boolean" },
+        "address": { "type": "object" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["userId", "items", "total"]
+      "required": ["email", "name"]
     },
     "Settings": {
       "title": "Settings",
-      "description": "Store-wide settings",
+      "description": "Global app settings",
       "type": "object",
       "properties": {
         "whatsapp": { "type": "string" },
         "instagram": { "type": "string" },
         "facebook": { "type": "string" },
         "email": { "type": "string" },
-        "address": { "type": "string" }
+        "address": { "type": "string" },
+        "phone": { "type": "string" }
       }
     }
   },
   "firestore": {
-    "products": {
+    "/products": {
       "schema": "Product",
-      "description": "Available products for sale"
+      "description": "Collection of all products available in the shop"
     },
-    "users": {
-      "schema": "User",
-      "description": "Registered users"
-    },
-    "orders": {
+    "/orders": {
       "schema": "Order",
-      "description": "Placed orders"
+      "description": "Customer orders"
     },
-    "settings": {
+    "/users": {
+      "schema": "User",
+      "description": "Registered user profiles"
+    },
+    "/settings": {
       "schema": "Settings",
-      "description": "Global store configuration"
+      "description": "Global application settings"
     }
   }
 }

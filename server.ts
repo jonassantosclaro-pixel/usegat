@@ -23,6 +23,7 @@ interface Order {
     numero: string;
     cidade: string;
     estado: string;
+    bairro?: string;
   };
   produtos: Array<{
     nome: string;

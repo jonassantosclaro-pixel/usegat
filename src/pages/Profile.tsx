@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAuth } from '@/src/lib/AuthContext';
-import { collection, query, where, getDocs, orderBy, doc, getDoc, updateDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, updateDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { formatPrice } from '@/src/lib/utils';
 import { Link } from 'react-router-dom';
@@ -44,28 +44,26 @@ export default function Profile() {
       });
     }
 
-    async function fetchData() {
-      try {
-        // Fetch Orders
-        const q = query(
-          collection(db, 'orders'), 
-          where('userId', '==', user!.uid),
-          orderBy('createdAt', 'desc')
-        );
-        const querySnapshot = await getDocs(q);
-        const fetchedOrders = querySnapshot.docs.map(doc => ({ 
-          id: doc.id, 
-          ...doc.data()
-        }));
-        setOrders(fetchedOrders);
-      } catch (error) {
-        console.error("Error fetching profile info:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
+    // Orders Real-time
+    const q = query(
+      collection(db, 'orders'), 
+      where('userId', '==', user.uid),
+      orderBy('createdAt', 'desc')
+    );
 
-    fetchData();
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const fetchedOrders = snapshot.docs.map(doc => ({ 
+        id: doc.id, 
+        ...doc.data()
+      }));
+      setOrders(fetchedOrders);
+      setLoading(false);
+    }, (error) => {
+      console.error("Error fetching orders:", error);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
   }, [user, userData]);
 
   const handleUpdateProfile = async (e: React.FormEvent) => {

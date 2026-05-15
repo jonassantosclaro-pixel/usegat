@@ -268,26 +268,26 @@ export default function Customizer() {
   if (loading) return <div className="min-h-screen flex items-center justify-center font-black">CARREGANDO...</div>;
 
   return (
-    <div className="min-h-screen bg-brand-bg flex flex-col pt-8">
+    <div className="min-h-screen bg-brand-pink-light flex flex-col pt-8">
       <div className="max-w-7xl mx-auto px-6 lg:px-10 w-full mb-8 flex justify-between items-center">
         <button 
           onClick={() => navigate(-1)}
-          className="flex items-center text-xs font-black uppercase tracking-widest hover:text-brand-red transition-all"
+          className="flex items-center text-xs font-black uppercase tracking-widest hover:text-brand-primary transition-all"
         >
           <ChevronLeft className="w-5 h-5 mr-1" />
           Voltar
         </button>
         <div className="text-center">
-          <h1 className="text-3xl font-black tracking-tighter uppercase mb-1">Customizar {product.name}</h1>
-          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-red italic">Sua arte, seu estilo</p>
+          <h1 className="text-3xl font-black tracking-tighter uppercase mb-1 text-brand-primary">Customizar {product.name}</h1>
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-primary italic">Sua arte, seu estilo</p>
         </div>
-        <div className="font-black text-xl">{formatPrice(product.price)}</div>
+        <div className="font-black text-xl text-brand-primary">{formatPrice(product.price)}</div>
       </div>
 
       <div className="flex-1 flex flex-col md:flex-row gap-8 max-w-7xl mx-auto px-6 lg:px-10 w-full pb-12">
         {/* Sidebar Controls */}
-        <div className="w-full md:w-80 bg-white rounded-[40px] p-8 shadow-xl flex flex-col border-4 border-brand-gray h-fit">
-          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-center mb-6 text-brand-red">Monte sua Arte</p>
+        <div className="w-full md:w-80 bg-white rounded-[40px] p-8 shadow-xl flex flex-col border border-brand-pink-light h-fit font-sans">
+          <p className="text-[10px] font-black uppercase tracking-[0.3em] text-center mb-6 text-brand-primary">Monte sua Arte</p>
           
           {product?.category === 'capas' && (
             <div className="mb-6 space-y-3">
@@ -298,7 +298,7 @@ export default function Customizer() {
                   setSelectedBrand(e.target.value);
                   setSelectedModel('');
                 }}
-                className="w-full bg-brand-gray rounded-xl p-3 text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-brand-yellow"
+                className="w-full bg-brand-pink-light rounded-xl p-3 text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-brand-primary"
               >
                 <option value="">Marca</option>
                 {phoneBrands.map(b => <option key={b.name} value={b.name}>{b.name}</option>)}
@@ -307,7 +307,7 @@ export default function Customizer() {
                 value={selectedModel} 
                 onChange={(e) => setSelectedModel(e.target.value)}
                 disabled={!selectedBrand}
-                className="w-full bg-brand-gray rounded-xl p-3 text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-brand-yellow disabled:opacity-50"
+                className="w-full bg-brand-pink-light rounded-xl p-3 text-[10px] font-black uppercase outline-none focus:ring-2 focus:ring-brand-primary disabled:opacity-50"
               >
                 <option value="">Modelo</option>
                 {selectedBrand && phoneBrands.find(b => b.name === selectedBrand)?.models.map(m => (
@@ -317,31 +317,31 @@ export default function Customizer() {
             </div>
           )}
 
-          <div className="flex gap-2 mb-8 bg-brand-gray p-2 rounded-full overflow-x-auto no-scrollbar">
+          <div className="flex gap-2 mb-8 bg-brand-pink-light p-2 rounded-full overflow-x-auto no-scrollbar">
             <button 
               onClick={() => setActiveTab('elements')}
-              className={`flex-1 flex items-center justify-center py-3 px-4 rounded-full transition-all min-w-[50px] ${activeTab === 'elements' ? 'bg-brand-black text-white shadow-lg' : 'text-gray-400 hover:text-brand-black'}`}
+              className={`flex-1 flex items-center justify-center py-3 px-4 rounded-full transition-all min-w-[50px] ${activeTab === 'elements' ? 'bg-brand-primary text-white shadow-lg' : 'text-gray-400 hover:text-brand-primary'}`}
               title="Elementos"
             >
               <ImageIcon className="w-5 h-5" />
             </button>
             <button 
               onClick={() => setActiveTab('stickers')}
-              className={`flex-1 flex items-center justify-center py-3 px-4 rounded-full transition-all min-w-[50px] ${activeTab === 'stickers' ? 'bg-brand-black text-white shadow-lg' : 'text-gray-400 hover:text-brand-black'}`}
+              className={`flex-1 flex items-center justify-center py-3 px-4 rounded-full transition-all min-w-[50px] ${activeTab === 'stickers' ? 'bg-brand-primary text-white shadow-lg' : 'text-gray-400 hover:text-brand-primary'}`}
               title="Emojis"
             >
               <Smile className="w-5 h-5" />
             </button>
             <button 
               onClick={() => setActiveTab('text')}
-              className={`flex-1 flex items-center justify-center py-3 px-4 rounded-full transition-all min-w-[50px] ${activeTab === 'text' ? 'bg-brand-black text-white shadow-lg' : 'text-gray-400 hover:text-brand-black'}`}
+              className={`flex-1 flex items-center justify-center py-3 px-4 rounded-full transition-all min-w-[50px] ${activeTab === 'text' ? 'bg-brand-primary text-white shadow-lg' : 'text-gray-400 hover:text-brand-primary'}`}
               title="Texto"
             >
               <Type className="w-5 h-5" />
             </button>
             <button 
               onClick={() => setActiveTab('upload')}
-              className={`flex-1 flex items-center justify-center py-3 px-4 rounded-full transition-all min-w-[50px] ${activeTab === 'upload' ? 'bg-brand-black text-white shadow-lg' : 'text-gray-400 hover:text-brand-black'}`}
+              className={`flex-1 flex items-center justify-center py-3 px-4 rounded-full transition-all min-w-[50px] ${activeTab === 'upload' ? 'bg-brand-primary text-white shadow-lg' : 'text-gray-400 hover:text-brand-primary'}`}
               title="Enviar Foto"
             >
               <Upload className="w-5 h-5" />
@@ -356,7 +356,7 @@ export default function Customizer() {
                     <button
                       key={cat}
                       onClick={() => setActiveCategory(cat as any)}
-                      className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeCategory === cat ? 'bg-brand-yellow text-brand-black shadow-md' : 'bg-brand-gray text-gray-500 hover:text-brand-black'}`}
+                      className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeCategory === cat ? 'bg-brand-primary text-white shadow-md' : 'bg-brand-pink-light text-gray-500 hover:text-brand-primary'}`}
                     >
                       {cat}
                     </button>
@@ -368,7 +368,7 @@ export default function Customizer() {
                     <button 
                       key={idx} 
                       onClick={() => addElement(url)}
-                      className="aspect-square bg-brand-gray rounded-2xl flex items-center justify-center p-2 hover:scale-110 active:scale-95 transition-all hover:bg-brand-yellow/50"
+                      className="aspect-square bg-brand-pink-light rounded-2xl flex items-center justify-center p-2 hover:scale-110 active:scale-95 transition-all hover:bg-brand-primary/10"
                     >
                       <img src={url} alt="Element" className="w-full h-full object-contain" />
                     </button>
@@ -384,7 +384,7 @@ export default function Customizer() {
                     <button 
                       key={emoji} 
                       onClick={() => addSticker(emoji)}
-                      className="aspect-square bg-brand-gray rounded-2xl flex items-center justify-center text-3xl hover:scale-110 active:scale-95 transition-all hover:bg-brand-yellow/50"
+                      className="aspect-square bg-brand-pink-light rounded-2xl flex items-center justify-center text-3xl hover:scale-110 active:scale-95 transition-all hover:bg-brand-primary/10"
                     >
                       {emoji}
                     </button>
@@ -403,7 +403,7 @@ export default function Customizer() {
                         key={f.value}
                         onClick={() => setSelectedFont(f.value)}
                         style={{ fontFamily: f.value }}
-                        className={`p-3 rounded-xl text-xs transition-all border-2 ${selectedFont === f.value ? 'bg-brand-black text-white border-brand-black shadow-lg scale-105' : 'bg-brand-gray text-brand-black border-transparent hover:border-brand-yellow'}`}
+                        className={`p-3 rounded-xl text-xs transition-all border-2 ${selectedFont === f.value ? 'bg-brand-primary text-white border-brand-primary shadow-lg scale-105' : 'bg-brand-pink-light text-brand-primary border-transparent hover:border-brand-primary/30'}`}
                       >
                         {f.name}
                       </button>
@@ -418,11 +418,11 @@ export default function Customizer() {
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     placeholder="Ex: Maria"
-                    className="w-full bg-brand-gray rounded-2xl p-4 font-bold outline-none focus:ring-4 focus:ring-brand-yellow/30"
+                    className="w-full bg-brand-pink-light rounded-2xl p-4 font-bold outline-none focus:ring-4 focus:ring-brand-primary/20"
                   />
                   <button 
                     onClick={addText}
-                    className="w-full mt-4 bg-brand-black text-white py-4 rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-brand-red transition-all shadow-xl"
+                    className="w-full mt-4 bg-brand-primary text-white py-4 rounded-full font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-all shadow-xl"
                   >
                     Personalizar Nome
                   </button>
@@ -432,27 +432,24 @@ export default function Customizer() {
 
             {activeTab === 'upload' && (
               <div className="space-y-6 text-center animate-in fade-in slide-in-from-bottom-2">
-                <div className="w-full aspect-video border-4 border-dashed border-brand-gray rounded-[30px] flex flex-col items-center justify-center p-6 bg-brand-bg hover:border-brand-yellow transition-colors relative group">
+                <div className="w-full aspect-video border-4 border-dashed border-brand-pink-light rounded-[30px] flex flex-col items-center justify-center p-6 bg-white hover:border-brand-primary transition-colors relative group">
                   <input 
                     type="file" 
                     accept="image/*"
                     onChange={handleImageUpload}
                     className="absolute inset-0 opacity-0 cursor-pointer"
                   />
-                  <ImageIcon className="w-10 h-10 text-gray-300 mb-2 group-hover:text-brand-yellow transition-colors" />
+                  <ImageIcon className="w-10 h-10 text-gray-300 mb-2 group-hover:text-brand-primary transition-colors" />
                   <p className="text-[8px] font-black uppercase tracking-[0.2em] text-gray-400">Enviar sua Foto</p>
                 </div>
-                <p className="text-[10px] text-gray-400 font-bold uppercase italic leading-relaxed">
-                  Coloque logos ou fotos pessoais diretamente no item.
-                </p>
               </div>
             )}
           </div>
 
-          <div className="mt-8 pt-6 border-t border-brand-gray flex flex-wrap gap-4">
+          <div className="mt-8 pt-6 border-t border-brand-pink-light flex flex-wrap gap-4">
             <button 
               onClick={removeSelected}
-              className="w-12 h-12 bg-red-50 text-brand-red rounded-full flex items-center justify-center hover:bg-brand-red hover:text-white transition-all border-2 border-brand-red/10"
+              className="w-12 h-12 bg-white text-muted-foreground rounded-full flex items-center justify-center hover:bg-brand-primary hover:text-white transition-all border border-brand-pink-light"
               title="Remover Selecionado"
             >
               <Trash2 className="w-5 h-5" />
@@ -465,14 +462,14 @@ export default function Customizer() {
                   fabricCanvas.current.renderAll();
                 }
               }}
-              className="w-12 h-12 bg-brand-gray text-brand-black rounded-full flex items-center justify-center hover:bg-brand-black hover:text-white transition-all"
+              className="w-12 h-12 bg-white text-muted-foreground rounded-full flex items-center justify-center hover:bg-brand-primary hover:text-white transition-all border border-brand-pink-light"
               title="Limpar Tudo"
             >
                <Download className="w-5 h-5 rotate-180" />
             </button>
             <button 
               onClick={handleSaveAndAdd}
-              className="flex-1 bg-brand-yellow text-brand-black py-4 rounded-full font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:scale-105 transition-transform shadow-xl shadow-brand-yellow/20"
+              className="flex-1 bg-brand-primary text-white py-4 rounded-full font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 hover:scale-105 transition-transform shadow-xl"
             >
               <Save className="w-4 h-4" />
               Finalizar Atendimento
@@ -481,9 +478,9 @@ export default function Customizer() {
         </div>
 
         {/* Canvas Area */}
-        <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-[60px] shadow-inner border-8 border-brand-gray p-12 overflow-hidden relative min-h-[600px]">
+        <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-[60px] shadow-inner border border-brand-pink-light p-12 overflow-hidden relative min-h-[600px]">
           <div className="mb-6 flex gap-4">
-            <div className="flex items-center gap-2 px-4 py-2 bg-brand-gray rounded-full text-[8px] font-black uppercase tracking-widest text-gray-400">
+            <div className="flex items-center gap-2 px-4 py-2 bg-brand-pink-light rounded-full text-[8px] font-black uppercase tracking-widest text-brand-primary">
                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
                Modo Edição Ativo
             </div>
@@ -491,15 +488,12 @@ export default function Customizer() {
 
           <div className="relative">
             {/* The base product image - Pure canvas look */}
-            <div className={`relative ${product?.category === 'capas' ? 'w-[320px] h-[600px] rounded-[50px] overflow-hidden border-[12px] border-brand-black shadow-2xl' : 'w-[380px] h-[550px] bg-brand-gray/5 rounded-[40px] flex items-center justify-center p-12 ring-4 ring-brand-gray/20'}`}>
+            <div className={`relative ${product?.category === 'capas' ? 'w-[320px] h-[600px] rounded-[50px] overflow-hidden border-[12px] border-brand-black shadow-2xl' : 'w-[380px] h-[550px] bg-brand-pink-light/30 rounded-[40px] flex items-center justify-center p-12 ring-1 ring-brand-pink-light'}`}>
               <img 
                 src={product.imageUrl} 
                 alt="Base" 
-                className={`max-w-full max-h-full object-contain transition-opacity grayscale ${product?.category === 'capas' ? 'absolute inset-0 w-full h-full object-cover opacity-10 mix-blend-overlay' : 'opacity-20 mix-blend-multiply group-hover:opacity-10'}`}
+                className={`max-w-full max-h-full object-contain transition-opacity grayscale ${product?.category === 'capas' ? 'absolute inset-0 w-full h-full object-cover opacity-10 mix-blend-overlay' : 'opacity-20 mix-blend-multiply'}`}
               />
-              {product?.category === 'capas' && (
-                <div className="absolute inset-0 bg-gradient-to-tr from-black/20 via-transparent to-white/10 pointer-events-none z-10"></div>
-              )}
               {/* The Fabric Canvas */}
               <div className="absolute inset-0 flex items-center justify-center pointer-events-auto z-0">
                 <canvas ref={canvasRef} />

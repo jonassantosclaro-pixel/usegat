@@ -1,73 +1,97 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Default Deny
+    // 0. Default Deny
     match /{document=**} {
       allow read, write: if false;
     }
 
-    // --- Helpers ---
-    function isSignedIn() {
-      return request.auth != null;
+    // --- Global Helpers ---
+    function isSignedIn() { return request.auth != null; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+    
+    // Auth Token Email is reliable for bootstrap
+    function isBootstrap() { 
+      return isSignedIn() && request.auth.token.email_verified == true && request.auth.token.email == 'jonassantosclaro@gmail.com'; 
     }
-
-    function isValidId(id) {
-      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
-    }
-
-    function incoming() {
-      return request.resource.data;
-    }
-
-    function existing() {
-      return resource.data;
-    }
-
-    // Role check: Admin
-    // Bootstrap user: jonassantosclaro@gmail.com
+    
+    // Admin check: either bootstrap or explicit role in users collection
     function isAdmin() {
-      return isSignedIn() && (
-        (request.auth.token.email == 'jonassantosclaro@gmail.com' && request.auth.token.email_verified == true) ||
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin'
-      );
-    }
-
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
+      return isBootstrap() || (isSignedIn() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin');
     }
 
     // --- Collections ---
 
-    // USERS
-    match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin();
-      allow create: if isOwner(userId) && 
-                      incoming().role == 'customer' &&
-                      incoming().keys().hasAll(['name', 'email', 'createdAt', 'lastLogin', 'role']);
-      allow update: if (isOwner(userId) && (
-        // Users cannot change their own role
-        !incoming().diff(existing()).affectedKeys().hasAny(['role'])
-      )) || isAdmin();
-    }
-
-    // PRODUCTS
+    // 1. PRODUCTS
     match /products/{productId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
+      allow read: if true; 
+      allow create: if isAdmin() && isValidProduct(incoming());
+      allow update: if isAdmin() && isValidProduct(incoming());
+      allow delete: if isAdmin();
     }
 
-    // ORDERS
-    match /orders/{orderId} {
-      allow list: if isAdmin() || (isSignedIn() && resource.data.userId == request.auth.uid);
-      allow get: if isAdmin() || (isSignedIn() && existing().userId == request.auth.uid);
-      allow create: if isSignedIn() && incoming().userId == request.auth.uid;
-      allow update, delete: if isAdmin();
+    function isValidProduct(data) {
+      return data.keys().hasAll(['name', 'price', 'category', 'imageUrl'])
+          && data.name is string && data.name.size() > 0 && data.name.size() <= 200
+          && data.price is number && data.price >= 0
+          && data.category is string && data.category.size() > 0
+          && data.imageUrl is string && data.imageUrl.size() <= 1000
+          && (data.get('stock', 0) is number)
+          && (data.get('customizable', false) is bool)
+          && (data.get('hasNameAndSurname', false) is bool)
+          && (data.get('isSuaHistoria', false) is bool)
+          && (data.get('subcategory', '') is string);
     }
 
-    // SETTINGS
+    // 2. SETTINGS
     match /settings/{settingId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // 3. USERS
+    match /users/{userId} {
+      // Security: Only owner or admin can read PII
+      allow get: if isSignedIn() && (request.auth.uid == userId || isAdmin());
+      // Admin can list customers
+      allow list: if isAdmin();
+      
+      allow create: if isSignedIn() && request.auth.uid == userId && isValidUser(incoming());
+      allow update: if isSignedIn() && request.auth.uid == userId 
+                   && (
+                     // Self-update: strict field allowlist
+                     (incoming().diff(existing()).affectedKeys().hasOnly(['name', 'photoURL', 'phone', 'address', 'lastLogin', 'email', 'uid', 'role', 'createdAt']) 
+                      && incoming().role == existing().role // Cannot elevate self
+                      && isValidUser(incoming())) ||
+                     // Admin or Bootstrap can do anything
+                     isAdmin()
+                   );
+    }
+
+    function isValidUser(data) {
+      return data.email is string && data.email.size() > 0
+          && (data.get('name', '') is string)
+          && (data.get('role', 'customer') in ['admin', 'customer']);
+    }
+
+    // 4. ORDERS
+    match /orders/{orderId} {
+      // Secure listing: rule forces client to filter by userId
+      allow list: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      allow get: if isSignedIn() && (resource.data.userId == request.auth.uid || isAdmin());
+      
+      allow create: if isSignedIn() && incoming().userId == request.auth.uid && isValidOrder(incoming());
+      allow update: if isAdmin(); // Only admin can update status
+    }
+
+    function isValidOrder(data) {
+      return data.userId is string && data.userId == request.auth.uid
+          && data.items is list && data.items.size() > 0 && data.items.size() <= 50
+          && data.total is number && data.total >= 0
+          && data.status in ['PENDENTE', 'PRODUÇÃO', 'ENVIADO', 'CONCLUÍDO', 'CANCELADO']
+          && (data.get('createdAt', '') is string);
     }
   }
 }
