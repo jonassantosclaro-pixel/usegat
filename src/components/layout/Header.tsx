@@ -31,7 +31,7 @@ export default function Header() {
           {/* Logo */}
           <Link to="/" className="flex items-center group relative z-10">
             <img 
-              src="https://i.postimg.cc/prwzf4PB/Chat-GPT-Image-15-05-2026-14-12-27.png" 
+              src="https://i.postimg.cc/63RvxFdQ/1.png" 
               alt="USE.GAT Logo" 
               className="h-10 sm:h-20 w-auto object-contain"
             />

@@ -81,6 +81,7 @@ export default function Cart() {
         text += `   _✨ Customização:_\n`;
         if (item.customization.nome) text += `   - Nome: ${item.customization.nome}\n`;
         if (item.customization.frase) text += `   - Frase/Data: ${item.customization.frase}\n`;
+        if (item.customization.fonte) text += `   - Fonte da Letra: ${item.customization.fonte}\n`;
         if (item.customization.elementsStyle) text += `   - Estilo: ${item.customization.elementsStyle === 'colorido' ? '🎨 Colorido' : '🔲 Contorno Preto'}\n`;
         if (item.customization.comidas) text += `   - Comidas: ${item.customization.comidas}\n`;
         if (item.customization.bebidas) text += `   - Bebidas: ${item.customization.bebidas}\n`;
@@ -228,6 +229,25 @@ export default function Cart() {
                         <div className="bg-[#FAF7F8] p-4 rounded-2xl space-y-1.5 text-[11px] font-medium text-brand-black border border-stone-100">
                           {item.customization.nome && <p><strong>Nome:</strong> {item.customization.nome}</p>}
                           {item.customization.frase && <p><strong>Frase/Data:</strong> {item.customization.frase}</p>}
+                          {item.customization.fonte && (
+                            <p>
+                              <strong>Fonte de Letra:</strong>{" "}
+                              <span 
+                                className="text-xs text-[#4D1D54] font-bold"
+                                style={{ 
+                                  fontFamily: item.customization.fonte === 'Hello Valentica' 
+                                    ? '"Hello Valentica", sans-serif'
+                                    : item.customization.fonte === 'Cream Cake'
+                                    ? '"Cream Cake", sans-serif'
+                                    : item.customization.fonte === 'Billion Miracles'
+                                    ? '"Billion Miracles", sans-serif'
+                                    : '"Quicksand", sans-serif'
+                                }}
+                              >
+                                {item.customization.fonte}
+                              </span>
+                            </p>
+                          )}
                           {item.customization.elementsStyle && (
                             <p><strong>Estilo dos Itens:</strong> {item.customization.elementsStyle === 'colorido' ? '🎨 Colorido' : '🔲 Contornos em Preto'}</p>
                           )}

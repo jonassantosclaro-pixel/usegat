@@ -38,7 +38,7 @@ export default function Footer() {
           <div className="bg-[#FAF7F8] p-6 sm:p-10 rounded-[2.5rem] border border-stone-150">
             <div className="flex flex-col items-center text-center space-y-6">
               <img 
-                src="https://i.postimg.cc/prwzf4PB/Chat-GPT-Image-15-05-2026-14-12-27.png" 
+                src="https://i.postimg.cc/rFHZmkSN/1.png" 
                 alt="USE GAT Logo" 
                 className="h-16 w-auto object-contain"
               />
@@ -270,7 +270,7 @@ export default function Footer() {
           <div className="flex flex-col items-center text-center space-y-6">
             <Link to="/">
               <img 
-                src="https://i.postimg.cc/prwzf4PB/Chat-GPT-Image-15-05-2026-14-12-27.png" 
+                src="https://i.postimg.cc/rFHZmkSN/1.png" 
                 alt="USE.GAT Logo" 
                 className="h-16 w-auto object-contain"
               />

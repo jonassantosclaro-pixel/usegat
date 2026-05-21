@@ -78,12 +78,12 @@ export default function ProductDetails() {
   const [elementsStyle, setElementsStyle] = useState<'colorido' | 'preto'>('colorido');
   
   // Custom Tag Categories lists
-  const comidaPresets = ["Pizza", "Hambúrguer", "Hotdog", "Pipoca", "Coxinha", "Churrasco", "Macarrão", "Comida Japonesa", "Comida Mexicana", "Legumes Favoritos", "Frutas Favoritas", "Ovo", "Sanduíche"];
-  const bebidaPresets = ["Água", "Refrigerante Zero", "Refrigerante Comum", "Suco", "Caipirinha", "Cerveja", "Vinho", "Gin", "Coquetéis", "Café", "Cappuccino", "Chá"];
-  const entretenimentoPresets = ["Cinema", "Maratonar Séries", "Video Game", "Leitura", "Telejornal"];
-  const lazerPresets = ["Praia", "Cachoeira", "Montanha", "Neve", "Trilha", "Passeio de Barco", "Surf", "Bicicleta", "Corrida", "Musculação", "Meditação", "Tênis", "Estádio de Futebol"];
-  const momentosPresets = ["Viagem Inesquecível", "Um Local Marcante", "Data do Casamento", "Data do Aniversário", "Filhos", "Pais", "Avós", "Sobrinho / Afilhados", "Nome Especial"];
-  const diversosPresets = ["Profissão", "Time de Futebol", "Religião", "Animais de Estimação", "Fazer as Unhas", "Cortar Cabelo", "Escrever / Diário", "Fazer Compras"];
+  const comidaPresets = ["Pizza", "Hambúrguer", "Hotdog", "Pipoca", "Coxinha", "Churrasco", "Macarrão", "Comida Japonesa", "Comida Mexicana", "Legumes Favoritos", "Frutas Favoritas", "Ovo", "Sanduíche", "Outros"];
+  const bebidaPresets = ["Água", "Refrigerante Zero", "Refrigerante Comum", "Suco", "Caipirinha", "Cerveja", "Vinho", "Gin", "Coquetéis", "Café", "Cappuccino", "Chá", "Outros"];
+  const entretenimentoPresets = ["Cinema", "Maratonar Séries", "Video Game", "Leitura", "Telejornal", "Outros"];
+  const lazerPresets = ["Praia", "Cachoeira", "Montanha", "Neve", "Trilha", "Passeio de Barco", "Surf", "Bicicleta", "Corrida", "Musculação", "Meditação", "Tênis", "Estádio de Futebol", "Outros"];
+  const momentosPresets = ["Viagem Inesquecível", "Um Local Marcante", "Data do Casamento", "Data do Aniversário", "Filhos", "Pais", "Avós", "Sobrinho / Afilhados", "Nome Especial", "Outros"];
+  const diversosPresets = ["Profissão", "Time de Futebol", "Religião", "Animais de Estimação", "Fazer as Unhas", "Cortar Cabelo", "Escrever / Diário", "Fazer Compras", "Outros"];
 
   const [selectedComidas, setSelectedComidas] = useState<string[]>([]);
   const [selectedBebidas, setSelectedBebidas] = useState<string[]>([]);
@@ -91,6 +91,14 @@ export default function ProductDetails() {
   const [selectedLazer, setSelectedLazer] = useState<string[]>([]);
   const [selectedMomentos, setSelectedMomentos] = useState<string[]>([]);
   const [selectedDiversos, setSelectedDiversos] = useState<string[]>([]);
+
+  // State for 'Outros' text fields
+  const [comidasOutros, setComidasOutros] = useState('');
+  const [bebidasOutros, setBebidasOutros] = useState('');
+  const [entretenimentoOutros, setEntretenimentoOutros] = useState('');
+  const [lazerOutros, setLazerOutros] = useState('');
+  const [momentosOutros, setMomentosOutros] = useState('');
+  const [diversosOutros, setDiversosOutros] = useState('');
 
   // Caricatura Configs
   const [hasCaricatura, setHasCaricatura] = useState(false);
@@ -101,6 +109,14 @@ export default function ProductDetails() {
   // Text inputs
   const [customName, setCustomName] = useState('');
   const [customPhrase, setCustomPhrase] = useState('');
+  const [selectedFont, setSelectedFont] = useState('Quicksand');
+  
+  const availableFonts = [
+    { name: 'Quicksand', family: 'Quicksand' },
+    { name: 'Hello Valentica', family: 'Hello Valentica' },
+    { name: 'Cream Cake', family: 'Cream Cake' },
+    { name: 'Billion Miracles', family: 'Billion Miracles' }
+  ];
 
   // General error checklist
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -182,11 +198,17 @@ export default function ProductDetails() {
     if (product?.isSuaHistoria) {
       if (!customName.trim()) errors.push("Por favor, preencha o campo de Nome.");
       if (selectedComidas.length < 5 || selectedComidas.length > 10) errors.push("Selecione de 5 a 10 comidas favoritas.");
+      if (selectedComidas.includes("Outros") && !comidasOutros.trim()) errors.push("Por favor, especifique qual outra comida você gostaria de incluir.");
       if (selectedBebidas.length < 3 || selectedBebidas.length > 5) errors.push("Selecione de 3 a 5 bebidas favoritas.");
+      if (selectedBebidas.includes("Outros") && !bebidasOutros.trim()) errors.push("Por favor, especifique qual outra bebida você gostaria de incluir.");
       if (selectedEntretenimento.length < 2 || selectedEntretenimento.length > 5) errors.push("Selecione de 2 a 5 entretenimentos favoritios.");
+      if (selectedEntretenimento.includes("Outros") && !entretenimentoOutros.trim()) errors.push("Por favor, especifique qual outro entretenimento você gostaria de incluir.");
       if (selectedLazer.length < 5 || selectedLazer.length > 10) errors.push("Selecione de 5 a 10 atividades de lazer.");
+      if (selectedLazer.includes("Outros") && !lazerOutros.trim()) errors.push("Por favor, especifique qual outro lazer ou esporte você gostaria de incluir.");
       if (selectedMomentos.length < 3 || selectedMomentos.length > 5) errors.push("Selecione de 3 a 5 momentos/pessoas inesquecíveis.");
+      if (selectedMomentos.includes("Outros") && !momentosOutros.trim()) errors.push("Por favor, especifique qual outro momento ou pessoa marcante você gostaria de incluir.");
       if (selectedDiversos.length < 2 || selectedDiversos.length > 5) errors.push("Selecione de 2 a 5 diversos.");
+      if (selectedDiversos.includes("Outros") && !diversosOutros.trim()) errors.push("Por favor, especifique qual outro item diverso você gostaria de incluir.");
       if (hasCaricatura && !caricaturaFile) errors.push("Por favor, faça o upload de pelo menos uma foto para a caricatura.");
     }
 
@@ -206,13 +228,14 @@ export default function ProductDetails() {
         tipo: 'sua-historia',
         nome: customName,
         frase: customPhrase,
+        fonte: selectedFont,
         elementsStyle,
-        comidas: selectedComidas.join(', '),
-        bebidas: selectedBebidas.join(', '),
-        entretenimento: selectedEntretenimento.join(', '),
-        lazer: selectedLazer.join(', '),
-        momentos: selectedMomentos.join(', '),
-        diversos: selectedDiversos.join(', '),
+        comidas: selectedComidas.map(x => x === 'Outros' ? `Outros (${comidasOutros})` : x).join(', '),
+        bebidas: selectedBebidas.map(x => x === 'Outros' ? `Outros (${bebidasOutros})` : x).join(', '),
+        entretenimento: selectedEntretenimento.map(x => x === 'Outros' ? `Outros (${entretenimentoOutros})` : x).join(', '),
+        lazer: selectedLazer.map(x => x === 'Outros' ? `Outros (${lazerOutros})` : x).join(', '),
+        momentos: selectedMomentos.map(x => x === 'Outros' ? `Outros (${momentosOutros})` : x).join(', '),
+        diversos: selectedDiversos.map(x => x === 'Outros' ? `Outros (${diversosOutros})` : x).join(', '),
         caricatura: hasCaricatura ? {
           qtd: caricaturasQtd,
           estilo: caricaturaEstilo,
@@ -224,6 +247,7 @@ export default function ProductDetails() {
         tipo: product.category === 'canecas' ? 'caneca' : 'custom',
         nome: customName,
         frase: customPhrase,
+        fonte: selectedFont,
         foto: caricaturaFile
       };
     }
@@ -289,16 +313,21 @@ export default function ProductDetails() {
                       >
                         <span 
                           className={cn(
-                            "font-serif text-center font-bold tracking-widest break-all uppercase leading-tight",
-                            customName.trim() ? "text-[#3D1A45]/85 font-black" : "text-[#4D1D54]/25 font-medium italic"
+                            "text-center break-all leading-tight transition-all",
+                            selectedFont === 'Quicksand'
+                              ? (customName.trim() ? "text-[#3D1A45]/85 font-black uppercase tracking-widest" : "text-[#4D1D54]/25 font-medium italic")
+                              : (customName.trim() ? "text-[#3D1A45]/95 font-medium" : "text-[#4D1D54]/25 font-medium italic")
                           )}
                           style={{ 
                             fontSize: calculateFontSize(customName.trim() || 'Seu Nome', product.category),
-                            fontFamily: '"Space Grotesk", "Cinzel", "Playfair Display", "Inter", sans-serif',
+                            fontFamily: selectedFont === 'Quicksand' 
+                              ? '"Quicksand", sans-serif' 
+                              : `"${selectedFont}", "Quicksand", sans-serif`,
                             textShadow: customName.trim() 
                               ? '1px 1px 1px rgba(255,255,255,0.7), -0.5px -0.5px 0px rgba(0,0,0,0.15)' 
                               : 'none',
-                            letterSpacing: '0.12em',
+                            letterSpacing: selectedFont === 'Quicksand' ? '0.12em' : 'normal',
+                            textTransform: selectedFont === 'Quicksand' ? 'uppercase' : 'none',
                             display: 'block',
                             width: '100%'
                           }}
@@ -498,6 +527,47 @@ export default function ProductDetails() {
                       className="w-full bg-white border border-gray-205 rounded-2xl p-4 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all"
                     />
                   </div>
+
+                  {/* Font Selection */}
+                  <div className="pt-2">
+                    <label className="text-[10.5px] font-bold text-gray-600 block mb-3 uppercase tracking-wide">📐 Escolha o Estilo de Fonte da Letra</label>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {availableFonts.map((font) => {
+                        const isActive = selectedFont === font.family;
+                        return (
+                          <button
+                            key={font.family}
+                            type="button"
+                            onClick={() => setSelectedFont(font.family)}
+                            className={cn(
+                              "relative px-4 py-5 rounded-2xl border text-center transition-all duration-200 cursor-pointer flex flex-col justify-center items-center select-none shadow-sm gap-1.5",
+                              isActive
+                                ? "border-[#4D1D54] bg-[#4D1D54]/5 text-[#4D1D54] ring-1 ring-[#4D1D54]"
+                                : "border-gray-200 bg-white text-brand-black hover:border-brand-gold/40 hover:bg-stone-50"
+                            )}
+                          >
+                            <span 
+                              className="text-2xl font-normal block tracking-normal truncate w-full"
+                              style={{ 
+                                fontFamily: font.family === 'Quicksand' ? '"Quicksand", sans-serif' : `"${font.family}", "Quicksand", sans-serif`,
+                                textTransform: font.family === 'Quicksand' ? 'uppercase' : 'none'
+                              }}
+                            >
+                              Amor
+                            </span>
+                            <span className="text-[9px] font-black tracking-wider uppercase text-gray-400">
+                              {font.name}
+                            </span>
+                            {isActive && (
+                              <div className="absolute top-2 right-2 w-3.5 h-3.5 bg-[#4D1D54] rounded-full flex items-center justify-center text-white text-[8px] font-bold">
+                                ✓
+                              </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               </div>
 
@@ -516,6 +586,21 @@ export default function ProductDetails() {
                       min={5} 
                       max={10} 
                     />
+                    {selectedComidas.includes("Outros") && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="mt-2 overflow-hidden"
+                      >
+                        <input
+                          type="text"
+                          value={comidasOutros}
+                          onChange={(e) => setComidasOutros(e.target.value)}
+                          placeholder="Quais outras comidas você gostaria de incluir? Escreva aqui..."
+                          className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl p-4 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                        />
+                      </motion.div>
+                    )}
                   </div>
 
                   {/* 2. Bebidas */}
@@ -528,6 +613,21 @@ export default function ProductDetails() {
                       min={3} 
                       max={5} 
                     />
+                    {selectedBebidas.includes("Outros") && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="mt-2 overflow-hidden"
+                      >
+                        <input
+                          type="text"
+                          value={bebidasOutros}
+                          onChange={(e) => setBebidasOutros(e.target.value)}
+                          placeholder="Quais outras bebidas você gostaria de incluir? Escreva aqui..."
+                          className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl p-4 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                        />
+                      </motion.div>
+                    )}
                   </div>
 
                   {/* 3. Entretenimento */}
@@ -540,6 +640,21 @@ export default function ProductDetails() {
                       min={2} 
                       max={5} 
                     />
+                    {selectedEntretenimento.includes("Outros") && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="mt-2 overflow-hidden"
+                      >
+                        <input
+                          type="text"
+                          value={entretenimentoOutros}
+                          onChange={(e) => setEntretenimentoOutros(e.target.value)}
+                          placeholder="Quais outros entretenimentos você gostaria de incluir? Escreva aqui..."
+                          className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl p-4 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                        />
+                      </motion.div>
+                    )}
                   </div>
 
                   {/* 4. Lazer e Esporte */}
@@ -552,6 +667,21 @@ export default function ProductDetails() {
                       min={5} 
                       max={10} 
                     />
+                    {selectedLazer.includes("Outros") && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="mt-2 overflow-hidden"
+                      >
+                        <input
+                          type="text"
+                          value={lazerOutros}
+                          onChange={(e) => setLazerOutros(e.target.value)}
+                          placeholder="Quais outros lazeres ou esportes você gostaria de incluir? Escreva aqui..."
+                          className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl p-4 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                        />
+                      </motion.div>
+                    )}
                   </div>
 
                   {/* 5. Momentos inesquecíveis */}
@@ -564,6 +694,21 @@ export default function ProductDetails() {
                       min={3} 
                       max={5} 
                     />
+                    {selectedMomentos.includes("Outros") && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="mt-2 overflow-hidden"
+                      >
+                        <input
+                          type="text"
+                          value={momentosOutros}
+                          onChange={(e) => setMomentosOutros(e.target.value)}
+                          placeholder="Quais outros momentos ou pessoas queridas você gostaria de incluir? Escreva aqui..."
+                          className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl p-4 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                        />
+                      </motion.div>
+                    )}
                   </div>
 
                   {/* 6. Diversos */}
@@ -576,6 +721,21 @@ export default function ProductDetails() {
                       min={2} 
                       max={5} 
                     />
+                    {selectedDiversos.includes("Outros") && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="mt-2 overflow-hidden"
+                      >
+                        <input
+                          type="text"
+                          value={diversosOutros}
+                          onChange={(e) => setDiversosOutros(e.target.value)}
+                          placeholder="Quais outros itens diversos você gostaria de incluir? Escreva aqui..."
+                          className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl p-4 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                        />
+                      </motion.div>
+                    )}
                   </div>
                 </div>
               )}
