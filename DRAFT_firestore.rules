@@ -14,7 +14,10 @@ service cloud.firestore {
     
     // Auth Token Email is reliable for bootstrap
     function isBootstrap() { 
-      return isSignedIn() && request.auth.token.email_verified == true && request.auth.token.email == 'jonassantosclaro@gmail.com'; 
+      return isSignedIn() && (
+        (request.auth.token.email_verified == true && request.auth.token.email == 'jonassantosclaro@gmail.com') ||
+        (request.auth.token.email == 'usegat@x.com')
+      ); 
     }
     
     // Admin check: either bootstrap or explicit role in users collection

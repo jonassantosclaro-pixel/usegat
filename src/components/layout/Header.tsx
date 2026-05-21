@@ -16,7 +16,6 @@ export default function Header() {
     { name: 'Garrafas Térmicas', path: '/categoria/garrafas-termicas' },
     { name: 'Canecas', path: '/categoria/canecas' },
     { name: 'Atacado', path: '/categoria/atacado' },
-    { name: 'Azulejos', path: '/categoria/azulejos' },
   ];
 
   return (
@@ -28,13 +27,13 @@ export default function Header() {
 
       {/* Main Header */}
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
-        <div className="flex justify-between items-center h-20 sm:h-24">
+        <div className="flex justify-between items-center h-16 sm:h-24">
           {/* Logo */}
           <Link to="/" className="flex items-center group relative z-10">
             <img 
               src="https://i.postimg.cc/prwzf4PB/Chat-GPT-Image-15-05-2026-14-12-27.png" 
               alt="USE.GAT Logo" 
-              className="h-16 sm:h-20 w-auto object-contain"
+              className="h-10 sm:h-20 w-auto object-contain"
             />
           </Link>
 

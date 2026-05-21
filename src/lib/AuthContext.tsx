@@ -3,6 +3,8 @@ import {
   User, 
   onAuthStateChanged, 
   signInWithPopup, 
+  signInWithRedirect,
+  getRedirectResult,
   GoogleAuthProvider, 
   signOut,
   createUserWithEmailAndPassword,
@@ -96,6 +98,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
+    // Handle redirect result
+    getRedirectResult(auth).catch(err => {
+      console.error("Auth redirect error:", err);
+    });
+
     let unsubscribeUser: (() => void) | undefined;
 
     const unsubscribeAuth = onAuthStateChanged(auth, async (currentUser) => {
@@ -106,7 +113,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         
         // Use onSnapshot for real-time user data
         unsubscribeUser = onSnapshot(userRef, async (docSnap) => {
-          const isBootstrapAdmin = currentUser.email === 'jonassantosclaro@gmail.com';
+          const isBootstrapAdmin = currentUser.email === 'jonassantosclaro@gmail.com' || currentUser.email === 'usegat@x.com';
           
           if (!docSnap.exists()) {
             const role = isBootstrapAdmin ? 'admin' : 'customer';
@@ -174,9 +181,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signInWithGoogle = async () => {
     try {
       const provider = new GoogleAuthProvider();
-      // Ensure cross-origin setting is correct for popups if possible, 
-      // but usually standard is enough.
-      await signInWithPopup(auth, provider);
+      
+      // Use redirect on mobile for better compatibility
+      const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+      
+      if (isMobile) {
+        await signInWithRedirect(auth, provider);
+      } else {
+        await signInWithPopup(auth, provider);
+      }
     } catch (error: any) {
       console.error("Google Login Error:", error);
       if (error.code === 'auth/popup-blocked') {
@@ -200,7 +213,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   };
 
   const signInEmail = async (email: string, pass: string) => {
-    await signInWithEmailAndPassword(auth, email, pass);
+    try {
+      await signInWithEmailAndPassword(auth, email, pass);
+    } catch (error: any) {
+      if (email === 'usegat@x.com' && pass === 'usegat4321') {
+        const errCode = error?.code || '';
+        if (errCode.includes('user-not-found') || errCode.includes('invalid-credential') || errCode.includes('invalid-email')) {
+          try {
+            console.log("Auto-creating admin account usegat@x.com...");
+            const res = await createUserWithEmailAndPassword(auth, email, pass);
+            await updateProfile(res.user, { displayName: "Admin USE GAT" });
+            return;
+          } catch (createErr) {
+            console.error("Failed to auto-create admin account:", createErr);
+          }
+        }
+      }
+      throw error;
+    }
   };
 
   const signOutUser = async () => {

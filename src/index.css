@@ -17,11 +17,7 @@
 }
 
 body {
-  background-image: url('https://i.postimg.cc/pLCQ42xQ/nasceu-no-corac-a-o-da-Cidade-Maravilhosa-atrave-s-do-sonho-de-uma-profissional-da-sau-de-que-busca.png');
-  background-attachment: fixed;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
+  background-color: #FCF9FA;
   color: var(--color-brand-black);
   font-family: var(--font-sans);
 }

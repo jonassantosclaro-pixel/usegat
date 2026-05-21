@@ -7,6 +7,7 @@ import axios from "axios";
 import admin from "firebase-admin";
 import { getFirestore } from "firebase-admin/firestore";
 import fs from "fs";
+import { GoogleGenAI } from "@google/genai";
 
 // Types
 interface Order {
@@ -695,6 +696,496 @@ app.post("/api/admin/melhorenvio/label/:orderId", async (req, res) => {
   }
 });
 
+// 6. AI Chat Endpoint
+const FAQ_CONTEXT = `
+Você é a assistente virtual oficial da USE GAT®.
+
+Sua função é responder clientes de forma:
+- profissional
+- objetiva
+- humana
+- educada
+- rápida
+- persuasiva
+- clara
+
+Você deve SEMPRE responder baseado EXCLUSIVAMENTE nas informações abaixo.
+
+NUNCA invente informações.
+NUNCA altere políticas da empresa.
+NUNCA prometa prazos diferentes.
+NUNCA diga algo fora deste treinamento.
+
+==================================================
+IDENTIDADE DA EMPRESA
+==================================================
+
+Empresa: USE GAT®
+Segmento: Produtos personalizados
+Atendimento:
+WhatsApp: (21) 4040-2224
+E-mail suporte: sac@usegat.com
+E-mail pedidos: meupedido@usegat.com
+
+==================================================
+ESTILO DE RESPOSTA
+==================================================
+
+- Respostas curtas e diretas
+- Linguagem amigável
+- Sempre educada
+- Nunca responder de forma robótica
+- Utilizar emojis moderadamente
+- Incentivar o cliente a finalizar a compra
+- Quando possível, direcionar para WhatsApp
+
+Exemplo de tom:
+"Claro 😊"
+"Sem problemas!"
+"Ficaremos felizes em produzir seu pedido 💜"
+
+==================================================
+PERGUNTAS E RESPOSTAS OFICIAIS
+==================================================
+
+[Pergunta]
+Como faço para personalizar meu pedido?
+
+[Resposta]
+Todos os produtos da USE GAT® são personalizados.
+Em cada página de produto você encontrará os campos disponíveis para preenchimento, como nomes, frases, fotos, datas e outras informações específicas do item escolhido.
+
+--------------------------------------------------
+
+[Pergunta]
+Posso enviar minha própria arte ou logo?
+
+[Resposta]
+Sim 😊
+Caso possua arte própria ou logotipo, utilize a opção “MINHA ARTE” disponível no menu principal do site para realizar o envio do arquivo.
+
+--------------------------------------------------
+
+[Pergunta]
+Vocês alteram a arte original?
+
+[Resposta]
+Não.
+Os produtos seguem fielmente o modelo apresentado no anúncio.
+Não realizamos alterações em:
+- cores
+- layout
+- posição de elementos
+- desenhos
+- tipografia/fonte
+
+--------------------------------------------------
+
+[Pergunta]
+O pedido ficará igual à foto do site?
+
+[Resposta]
+Sim 😊
+O produto final seguirá exatamente o modelo anunciado, alterando apenas os dados personalizados enviados pelo cliente.
+
+--------------------------------------------------
+
+[Pergunta]
+Posso ver uma prévia antes da produção?
+
+[Resposta]
+Não enviamos prévias de arte para pedidos realizados pelo site.
+A personalização segue exatamente o modelo escolhido no anúncio.
+
+--------------------------------------------------
+
+[Pergunta]
+Posso alterar meu pedido depois da compra?
+
+[Resposta]
+Sim, caso seja necessário corrigir alguma informação, entre em contato em até 24 horas após a compra.
+
+WhatsApp: (21) 4040-2224
+E-mail: meupedido@usegat.com
+
+Após esse prazo o pedido entra em produção e não poderá mais ser alterado.
+
+--------------------------------------------------
+
+[Pergunta]
+Vocês fazem apenas uma unidade?
+
+[Resposta]
+Sim 😊
+Produzimos pedidos a partir de 1 unidade.
+
+--------------------------------------------------
+
+[Pergunta]
+Existe quantidade mínima?
+
+[Resposta]
+Não.
+Apenas pedidos no atacado possuem condições específicas.
+
+--------------------------------------------------
+
+[Pergunta]
+Vocês fazem atacado?
+
+[Resposta]
+Sim 😊
+Pedidos acima de 10 unidades possuem descontos especiais.
+
+Para orçamento:
+WhatsApp: (21) 4040-2224
+
+--------------------------------------------------
+
+[Pergunta]
+Qual o prazo de produção?
+
+[Resposta]
+Após a confirmação do pagamento, o prazo de produção é de 5 a 7 dias úteis.
+
+--------------------------------------------------
+
+[Pergunta]
+Vocês fazem pedidos urgentes?
+
+[Resposta]
+Sempre buscamos agilizar os pedidos 😊
+Porém seguimos o prazo padrão de produção de 5 a 7 dias úteis, além do prazo da transportadora.
+
+--------------------------------------------------
+
+[Pergunta]
+Quanto tempo leva a entrega?
+
+[Resposta]
+O prazo de entrega varia conforme a região e a transportadora escolhida no checkout.
+
+--------------------------------------------------
+
+[Pergunta]
+Como acompanho meu pedido?
+
+[Resposta]
+Após o envio, o código de rastreio é enviado por e-mail 😊
+
+--------------------------------------------------
+
+[Pergunta]
+Vocês entregam para todo o Brasil?
+
+[Resposta]
+Sim 😊
+Realizamos envios para todo o território nacional.
+
+--------------------------------------------------
+
+[Pergunta]
+Qual o valor do frete?
+
+[Resposta]
+O frete é calculado automaticamente no checkout ou na página do produto.
+
+--------------------------------------------------
+
+[Pergunta]
+Posso retirar pessoalmente?
+
+[Resposta]
+Sim.
+A retirada em Brasília deve ser combinada antecipadamente pelo WhatsApp:
+(21) 4040-2224
+
+--------------------------------------------------
+
+[Pergunta]
+Quais formas de pagamento vocês aceitam?
+
+[Resposta]
+Aceitamos:
+- Pix
+- cartão de crédito
+- boleto bancário
+
+Os pagamentos são processados com segurança pela PAGBANK®.
+
+--------------------------------------------------
+
+[Pergunta]
+Tem desconto no Pix?
+
+[Resposta]
+Sim 😊
+Compras via Pix possuem 10% de desconto nos produtos.
+
+--------------------------------------------------
+
+[Pergunta]
+Parcelam no cartão?
+
+[Resposta]
+Sim 😊
+Parcelamos em até 10x no cartão de crédito.
+
+--------------------------------------------------
+
+[Pergunta]
+O produto pode chegar quebrado ou com defeito?
+
+[Resposta]
+Em casos de defeito de fabricação ou avaria no transporte, entre em contato em até 7 dias após o recebimento.
+
+E-mail:
+sac@usegat.com
+
+--------------------------------------------------
+
+[Pergunta]
+Posso trocar um produto personalizado?
+
+[Resposta]
+Trocas são realizadas apenas em casos de defeito de fabricação identificados em até 7 dias após o recebimento.
+
+--------------------------------------------------
+
+[Pergunta]
+Me arrependi da compra. Posso devolver?
+
+[Resposta]
+Produtos personalizados não possuem devolução por arrependimento, conforme o Art. 49 do Código de Defesa do Consumidor.
+
+--------------------------------------------------
+
+[Pergunta]
+A personalização desbota?
+
+[Resposta]
+Não 😊
+Utilizamos materiais de alta qualidade com excelente durabilidade.
+Recomendamos evitar produtos abrasivos e lava-louças para maior conservação.
+
+==================================================
+REGRAS IMPORTANTES DA IA
+==================================================
+
+- Sempre responder em português brasileiro
+- Nunca responder fora do contexto da USE GAT®
+- Nunca inventar políticas
+- Nunca criar prazos falsos
+- Nunca informar algo que não esteja neste treinamento
+- Caso não saiba responder:
+"Dúvida muito específica 😊
+Por favor entre em contato com nosso suporte:
+WhatsApp: (21) 4040-2224"
+
+==================================================
+OBJETIVO FINAL
+==================================================
+
+A IA deve:
+- tirar dúvidas
+- reduzir abandono de carrinho
+- aumentar vendas
+- transmitir confiança
+- parecer atendimento humano
+- incentivar finalização da compra
+- direcionar clientes para WhatsApp quando necessário
+`;
+
+function getLocalFAQResponse(userMessage: string): string {
+  // Normalize string (lowercase, remove accents)
+  const normalize = (str: string) => {
+    return str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w\s]/gi, "");
+  };
+
+  const text = normalize(userMessage);
+
+  // Define matcher rules (keywords & answers)
+  const rules = [
+    {
+      keywords: ["personalizar", "personalizacao", "gravar", "nome", "foto", "dados", "texto", "preencher"],
+      answer: "Todos os produtos da USE GAT® são personalizados. 😊\nEm cada página de produto você encontrará os campos disponíveis para preenchimento, como nomes, frases, fotos, datas e outras informações específicas do item escolhido."
+    },
+    {
+      keywords: ["minha arte", "arte propria", "propria arte", "logotipo", "logo", "enviar arte", "enviar logo", "meu desenho"],
+      answer: "Sim! 😊 Caso possua arte própria ou logotipo, utilize a opção “MINHA ARTE” disponível no menu principal do site para realizar o envio do arquivo."
+    },
+    {
+      keywords: ["alterar arte", "mudar desenho", "mudar cor", "altera arte", "cor estrutural", "alterar cores", "mudar posicao", "mudar fonte"],
+      answer: "Não realizamos alterações estruturais. Os produtos seguem fielmente o modelo apresentado no anúncio.\n\nNão realizamos alterações em:\n- cores\n- layout\n- posição de elementos\n- desenhos\n- tipografia/fonte"
+    },
+    {
+      keywords: ["igual a foto", "igual à foto", "vai ser igual", "fidelidade", "ficar igual", "fiel"],
+      answer: "Sim! 😊 O produto final seguirá exatamente o modelo anunciado, alterando apenas os dados personalizados enviados pelo cliente."
+    },
+    {
+      keywords: ["previa", "ver antes", "esboco", "enviar previa", "ver a previa", "mostra arte", "amostra"],
+      answer: "Não enviamos prévias de arte para pedidos realizados pelo site. A personalização segue exatamente o modelo escolhido no anúncio."
+    },
+    {
+      keywords: ["alterar pedido", "mudar pedido", "mudar dados", "corrigir", "errei", "errado", "alterar apos", "mudar nome"],
+      answer: "Sim, caso seja necessário corrigir alguma informação do seu pedido, entre em contato em até 24 horas após a compra.\n\nWhatsApp: (21) 4040-2224\nE-mail: meupedido@usegat.com\n\nApós esse prazo, o pedido entra em produção e não poderá mais ser alterado."
+    },
+    {
+      keywords: ["uma unidade", "1 unidade", "so uma", "só uma", "so de 1", "só de 1", "fazer uma", "comprar um", "comprar uma"],
+      answer: "Sim! 😊 Produzimos pedidos a partir de 1 unidade."
+    },
+    {
+      keywords: ["minimo", "minima", "quantidade minima", "quantidade mínima", "pedido minimo"],
+      answer: "Não há quantidade mínima. 😊 Produzimos a partir de 1 unidade. Apenas pedidos no atacado possuem condições específicas."
+    },
+    {
+      keywords: ["atacado", "acima de 10", "comprar lote", "revenda", "lote", "vender", "desconto quantidade"],
+      answer: "Sim! 😊 Pedidos acima de 10 unidades possuem descontos especiais.\n\nPara fazer um orçamento de atacado, entre em contato via WhatsApp:\n(21) 4040-2224"
+    },
+    {
+      keywords: ["prazo", "producao", "produzir", "tempo para fazer", "confeccao", "prazo de producao", "fazer"],
+      answer: "Após a confirmação do pagamento, o prazo de produção de cada peça personalizada (desenho e gravação) é de 5 a 7 dias úteis."
+    },
+    {
+      keywords: ["urgente", "urgencia", "pressa", "rapido", "acelerar", "antecipar", "emergencia", "prazo curto"],
+      answer: "Sempre buscamos agilizar os pedidos! 😊 Porém seguimos o prazo padrão de produção de 5 a 7 dias úteis, além do prazo da transportadora."
+    },
+    {
+      keywords: ["entrega", "prazo de entrega", "quanto tempo", "demora", "chegar", "transporte", "correio", "sedex", "pac"],
+      answer: "O prazo de entrega varia conforme a sua região e a transportadora escolhida no checkout. Após postarmos seu pedido nos Correios/transportadora, o prazo corre por conta deles."
+    },
+    {
+      keywords: ["rastrear", "rastreio", "codigo de rastreio", "enviar rastreio", "acompanhar", "onde esta", "postagem"],
+      answer: "Assim que seu pedido for postado, nós enviaremos o código de rastreio oficial diretamente em seu e-mail cadastrado! 😊"
+    },
+    {
+      keywords: ["todo o brasil", "entrega brasil", "envia para", "meu estado", "enviam para", "enviar para", "frete para"],
+      answer: "Sim! 😊 Realizamos envios seguros para todo o território nacional."
+    },
+    {
+      keywords: ["valor do frete", "quanto é o frete", "frete gratis", "frete pago", "calcular frete", "custo do frete"],
+      answer: "O valor do frete é calculated automaticamente no checkout ou diretamente na página do produto inserindo seu CEP."
+    },
+    {
+      keywords: ["retirar", "retirada", "pessoalmente", "pegar", "brasilia", "retirar em", "busca", "df"],
+      answer: "Sim! Para retirada pessoalmente em Brasília (DF), por favor, combine os detalhes conosco antecipadamente pelo WhatsApp: (21) 4040-2224 antes de finalizar a compra."
+    },
+    {
+      keywords: ["formas de pagamento", "pagar", "pagamento", "boleto", "cartao", "pix", "aceita", "parcela", "credito"],
+      answer: "Aceitamos Pix, cartão de crédito (em até 10x) e boleto bancário.\n\nTodo o pagamento é processado com 100% de segurança via PAGBANK®."
+    },
+    {
+      keywords: ["desconto pix", "pix tem desconto", "desconto no pix", "pago no pix", "pagamento pix"],
+      answer: "Sim! 😊 Compras realizadas via Pix ganham automaticamente 10% de desconto no valor de todos os produtos do carrinho."
+    },
+    {
+      keywords: ["parcelar", "parcelamento", "parcelas", "vezes", "dividir", "credito 10x"],
+      answer: "Sim! 😊 Parcelamos em até 10x no cartão de crédito, sendo em até 3x sem juros."
+    },
+    {
+      keywords: ["quebrado", "defeito", "avaria", "danificado", "estragou", "quebrou", "amassou", "riscado"],
+      answer: "Fique tranquilo(a)! Se houver avarias no transporte ou qualquer defeito do ateliê, garantimos a substituição sem custos. Entre em contato em até 7 dias no e-mail: sac@usegat.com"
+    },
+    {
+      keywords: ["trocar personalizado", "troca de personalizado", "trocar garrafa", "trocar caneca", "troca"],
+      answer: "Por serem peças únicas e sob medida, trocas de itens personalizados são realizadas exclusivamente em caso de defeito de fabricação ou danos no transporte relatados em até 7 dias corridos."
+    },
+    {
+      keywords: ["devolver", "arrependi", "cancelar", "desistir", "devolucao", "arrependimento"],
+      answer: "Conforme o Artigo 49 do Código de Defesa do Consumidor, produtos sob medida e totalmente personalizados não possuem direito de devolução por arrependimento, por serem inviáveis para revenda."
+    },
+    {
+      keywords: ["desbota", "sai", "lava louca", "lavar", "durabilidade", "qualidade", "microondas", "micro-ondas"],
+      answer: "Não desbota e não sai! 😊 Nossas gravações a laser e impressões de cerâmica são de altíssima qualidade. Recomendamos apenas lavar com o lado macio da bucha, evitar produtos abrasivos e evitar lava-louças para durabilidade eterna."
+    }
+  ];
+
+  // Try to find matching rule
+  let bestMatch = null;
+  let maxScore = 0;
+
+  for (const rule of rules) {
+    let score = 0;
+    for (const kw of rule.keywords) {
+      const kwNormalized = normalize(kw);
+      if (text.includes(kwNormalized)) {
+        score += kwNormalized.split(" ").length; // weight multi-word keywords more
+      }
+    }
+    if (score > maxScore) {
+      maxScore = score;
+      bestMatch = rule;
+    }
+  }
+
+  if (bestMatch && maxScore > 0) {
+    return bestMatch.answer;
+  }
+
+  // Fallback
+  return "Dúvida muito específica 😊\nPor favor entre em contato com nosso suporte direto pelo WhatsApp para que possamos te ajudar perfeitamente:\n\nWhatsApp: (21) 4040-2224";
+}
+
+app.post("/api/chat", async (req, res) => {
+  try {
+    const { message } = req.body;
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    // Direct fallback if api key is missing, empty, or default placeholder
+    if (!apiKey || apiKey === "undefined" || apiKey.includes("MY_GEMINI_API_KEY") || apiKey.trim() === "") {
+      const fallbackText = getLocalFAQResponse(message || "");
+      return res.json({ text: fallbackText });
+    }
+
+    const ai = new GoogleGenAI({ 
+      apiKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        }
+      }
+    });
+    
+    const response = await ai.models.generateContent({
+      model: "gemini-3.5-flash",
+      contents: message,
+      config: {
+        systemInstruction: FAQ_CONTEXT
+      }
+    });
+
+    res.json({ text: response.text });
+  } catch (error: any) {
+    const errorMsg = error?.message?.toLowerCase() || "";
+    const isKeyError = errorMsg.includes("api key") || 
+                       errorMsg.includes("credential") ||
+                       errorMsg.includes("not valid") ||
+                       errorMsg.includes("leaked") ||
+                       errorMsg.includes("permission_denied") ||
+                       errorMsg.includes("invalid") ||
+                       error?.status === 400 || 
+                       error?.status === 403;
+
+    if (isKeyError) {
+      console.warn("[Gat IA] Invalid, leaked or unconfigured API key. Falling back seamlessly to local FAQ matcher.");
+    } else {
+      console.error("[Gat IA] Error during generation:", error);
+    }
+
+    try {
+      const fallbackText = getLocalFAQResponse(req.body.message || "");
+      res.json({ text: fallbackText });
+    } catch (fallbackError) {
+      console.error("[Gat IA] Local Fallback Error:", fallbackError);
+      res.status(500).json({ error: "Erro ao processar consulta da IA." });
+    }
+  }
+});
+
 // Vite integration
 async function subtractStock(produtos: any[]) {
   try {
@@ -715,20 +1206,24 @@ async function subtractStock(produtos: any[]) {
   }
 }
 
-if (process.env.NODE_ENV !== "production") {
-  const vite = await createViteServer({
-    server: { middlewareMode: true },
-    appType: "spa",
-  });
-  app.use(vite.middlewares);
-} else {
-  const distPath = path.join(process.cwd(), 'dist');
-  app.use(express.static(distPath));
-  app.get('*', (req, res) => {
-    res.sendFile(path.join(distPath, 'index.html'));
+async function startServer() {
+  if (process.env.NODE_ENV !== "production") {
+    const vite = await createViteServer({
+      server: { middlewareMode: true },
+      appType: "spa",
+    });
+    app.use(vite.middlewares);
+  } else {
+    const distPath = path.join(process.cwd(), 'dist');
+    app.use(express.static(distPath));
+    app.get('*', (req, res) => {
+      res.sendFile(path.join(distPath, 'index.html'));
+    });
+  }
+
+  app.listen(PORT, "0.0.0.0", () => {
+    console.log(`Server running on http://localhost:${PORT}`);
   });
 }
 
-app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-});
+startServer();

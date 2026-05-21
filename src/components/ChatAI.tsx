@@ -1,56 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Send, X, Bot, Sparkles, MessageSquare, Instagram, Phone } from 'lucide-react';
-import { GoogleGenAI } from "@google/genai";
 import { cn } from '@/src/lib/utils';
-
-const FAQ_CONTEXT = `
-Você é o assistente virtual da USE GAT®, uma marca especializada em presentes personalizados criativos como canecas e garrafas térmicas. 
-Seu tom de voz deve ser humano, amigável, acolhedor e prestativo.
-
-INFORMAÇÕES SOBRE A USE GAT:
-- História: Começou em 2023 em uma pequena lavanderia de menos de 2m². Hoje entrega para todo o Brasil.
-- Significado do Nome: GAT significa "gato" em Catalão. É uma homenagem ao pai da fundadora e às memórias de infância.
-- Missão: Transformar lindas lembranças em algo físico, eterno e cheio de significado.
-
-DÚVIDAS FREQUENTES (FAQ):
-1. Personalização: Todos os produtos são personalizados. Cada página informa o que pode ser incluído (nome, foto, data, etc). Confira sempre a descrição.
-2. Organização: Envie informações claras nos campos específicos para ajudar nossa produção.
-3. Arte Própria/Logo: Sim! Use o campo "MINHA ARTE" no menu principal para upload.
-4. Envio de Dados: Envie fotos/textos diretamente nos campos da página do produto.
-5. Alteração de Arte: Não alteramos cores, posição, desenhos ou fontes do modelo original. Segue fielmente o anúncio.
-6. Fidelidade: O produto será igual à foto, mudando apenas seus dados. A qualidade da foto enviada é responsabilidade do cliente.
-7. Prévia: Não enviamos prévias, pois seguimos o modelo escolhido.
-8. Alterar após envio: Errou algo? Entre em contato em até 24h (meupedido@usegat.com ou WhatsApp (21) 4040-2224). Após isso, vai para produção e não há cancelamento.
-9. Mínimo: Não exigimos quantidade mínima (exceto atacado). Produzimos a partir de 1 unidade.
-10. Atacado: Sim! Descontos acima de 10 unidades. Contato WhatsApp: (21) 4040-2224 ou menu "ATACADO".
-11. Prazo Produção: 5 a 7 dias úteis após confirmação do pagamento.
-12. Urgência: O prazo é padrão (5-7 dias). Considere o tempo da transportadora também.
-13. Entrega Antecipada: Não temos autonomia sobre o prazo da transportadora após a postagem.
-14. Tempo de Entrega: Varia por região e frete escolhido no checkout.
-15. Rastreio: Enviado por e-mail após a postagem.
-16. Embalagem: Todos os itens de varejo já vão prontos para presente! Atacado vai em embalagem neutra.
-17. Pagamento: Cartão (até 10x, sendo 3x sem juros), Boleto e Pix (PagBank).
-18. Desconto Pix: 10% DE DESCONTO no valor dos produtos via Pix!
-19. Cobertura: Entregamos em todo o Brasil.
-20. Retirada: Em Brasília, combine pelo WhatsApp (21) 4040-2224 antes de finalizar a compra.
-21. Avaria/Defeito: Entre em contato em até 7 dias (sac@usegat.com) para reembolso ou novo envio.
-22. Troca Personalizados: Apenas por defeito. Não há troca por arrependimento em itens personalizados (Art. 49 CDC).
-23. Durabilidade: Alta qualidade. Não sai no uso comum. Lave com lado macio, evite abrasivos e lava-louças.
-
-CONTATOS E REDES SOCIAIS:
-- Instagram: @use.gat (indique sempre que possível)
-- WhatsApp: (21) 4040-2224
-- E-mail Pedidos: meupedido@usegat.com
-- E-mail SAC: sac@usegat.com
-
-DIRETRIZES DE RESPOSTA:
-- Seja sempre educado e use emojis moderadamente.
-- Se não souber algo, direcione para o WhatsApp (21) 4040-2224.
-- Sempre indique o Instagram @use.gat.
-- Informe sobre o desconto de 10% no PIX.
-- Explique bem que não há trocas por arrependimento em itens personalizados.
-`;
 
 interface Message {
   role: 'user' | 'assistant';
@@ -72,30 +23,30 @@ export default function ChatAI() {
     }
   }, [messages]);
 
-  const handleSend = async () => {
-    if (!input.trim() || isLoading) return;
+  const handleSend = async (forcedMessage?: string) => {
+    const textToSend = forcedMessage || input.trim();
+    if (!textToSend || isLoading) return;
 
-    const userMessage = input.trim();
-    setInput('');
-    setMessages(prev => [...prev, { role: 'user', content: userMessage }]);
+    if (!forcedMessage) setInput('');
+    setMessages(prev => [...prev, { role: 'user', content: textToSend }]);
     setIsLoading(true);
 
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      // Map history to Gemini format if needed, but here we just send the new message
+      // and let the server handle the context or just stateless for now to simplify
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          message: textToSend,
+          // We can eventually send history here too
+        }),
+      });
+
+      if (!response.ok) throw new Error('Network response was not ok');
       
-      const chat = ai.chats.create({
-        model: "gemini-3-flash-preview",
-        config: {
-          systemInstruction: FAQ_CONTEXT,
-        },
-      });
-
-      // Simple history mapping
-      const result = await chat.sendMessage({ 
-        message: userMessage 
-      });
-
-      const responseText = result.text || 'Desculpe, tive um probleminha. Pode repetir?';
+      const data = await response.json();
+      const responseText = data.text || 'Desculpe, tive um probleminha. Pode repetir?';
       setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
     } catch (error) {
       console.error('Chat Error:', error);
@@ -187,19 +138,13 @@ export default function ChatAI() {
             {/* Quick Actions */}
             <div className="px-6 py-2 flex gap-2 overflow-x-auto no-scrollbar">
               <button 
-                onClick={() => {
-                  setInput('Como personalizar?');
-                  handleSend();
-                }}
+                onClick={() => handleSend('Como personalizar?')}
                 className="whitespace-nowrap px-3 py-1.5 bg-brand-pink-medium rounded-full text-[10px] font-bold text-brand-primary hover:bg-brand-primary hover:text-white transition-colors border border-brand-pink-light"
               >
                 🎨 Como personalizar?
               </button>
               <button 
-                onClick={() => {
-                  setInput('Qual o prazo de entrega?');
-                  handleSend();
-                }}
+                onClick={() => handleSend('Qual o prazo de entrega?')}
                 className="whitespace-nowrap px-3 py-1.5 bg-brand-pink-medium rounded-full text-[10px] font-bold text-brand-primary hover:bg-brand-primary hover:text-white transition-colors border border-brand-pink-light"
               >
                 🚚 Prazo de entrega
