@@ -30,7 +30,13 @@ export default function AuthPage() {
         if (!name) throw new Error('Nome é obrigatório');
         await signUpEmail(email, password, name);
       }
-      navigate(from, { replace: true });
+      
+      const lowerEmail = email.trim().toLowerCase();
+      if (lowerEmail === 'usegat@x.com' || lowerEmail === 'jonassantosclaro@gmail.com') {
+        navigate('/admin', { replace: true });
+      } else {
+        navigate(from, { replace: true });
+      }
     } catch (err: any) {
       console.error(err);
       setError(err.message.includes('auth/invalid-credential') 

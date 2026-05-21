@@ -39,7 +39,6 @@ export default function ChatAI() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
           message: textToSend,
-          // We can eventually send history here too
         }),
       });
 
@@ -49,8 +48,9 @@ export default function ChatAI() {
       const responseText = data.text || 'Desculpe, tive um probleminha. Pode repetir?';
       setMessages(prev => [...prev, { role: 'assistant', content: responseText }]);
     } catch (error) {
-      console.error('Chat Error:', error);
-      setMessages(prev => [...prev, { role: 'assistant', content: 'Ops! Parece que meus circuitos deram um nó. Pode me chamar no WhatsApp? (21) 4040-2224' }]);
+      console.warn('Chat API Error, falling back to local client-side FAQ matcher:', error);
+      const fallbackText = getClientFAQResponse(textToSend);
+      setMessages(prev => [...prev, { role: 'assistant', content: fallbackText }]);
     } finally {
       setIsLoading(false);
     }
@@ -182,4 +182,134 @@ export default function ChatAI() {
       </AnimatePresence>
     </>
   );
+}
+
+function getClientFAQResponse(userMessage: string): string {
+  const normalize = (str: string) => {
+    return str
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^\w\s]/gi, "");
+  };
+
+  const text = normalize(userMessage);
+
+  const rules = [
+    {
+      keywords: ["personalizar", "personalizacao", "gravar", "nome", "foto", "dados", "texto", "preencher"],
+      answer: "Todos os produtos da USE GAT® são personalizados. 😊\nEm cada página de produto você encontrará os campos disponíveis para preenchimento, como nomes, frases, fotos, datas e outras informações específicas do item escolhido."
+    },
+    {
+      keywords: ["minha arte", "arte propria", "propria arte", "logotipo", "logo", "enviar arte", "enviar logo", "meu desenho"],
+      answer: "Sim! 😊 Caso possua arte própria ou logotipo, utilize a opção “MINHA ARTE” disponível no menu principal do site para realizar o envio do arquivo."
+    },
+    {
+      keywords: ["alterar arte", "mudar desenho", "mudar cor", "altera arte", "cor estrutural", "alterar cores", "mudar posicao", "mudar fonte"],
+      answer: "Não realizamos alterações estruturais. Os produtos seguem fielmente o modelo apresentado no anúncio.\n\nNão realizamos alterações em:\n- cores\n- layout\n- posição de elementos\n- desenhos\n- tipografia/fonte"
+    },
+    {
+      keywords: ["igual a foto", "igual à foto", "vai ser igual", "fidelidade", "ficar igual", "fiel"],
+      answer: "Sim! 😊 O produto final seguirá exatamente o modelo anunciado, alterando apenas os dados personalizados enviados pelo cliente."
+    },
+    {
+      keywords: ["previa", "ver antes", "esboco", "enviar previa", "ver a previa", "mostra arte", "amostra"],
+      answer: "Não enviamos prévias de arte para pedidos realizados pelo site. A personalização segue exatamente o modelo escolhido no anúncio."
+    },
+    {
+      keywords: ["alterar pedido", "mudar pedido", "mudar dados", "corrigir", "errei", "errado", "alterar apos", "mudar nome"],
+      answer: "Sim, caso seja necessário corrigir alguma informação do seu pedido, entre em contato em até 24 horas após a compra.\n\nWhatsApp: (21) 4040-2224\nE-mail: meupedido@usegat.com\n\nApós esse prazo, o pedido entra em produção e não poderá mais ser alterado."
+    },
+    {
+      keywords: ["uma unidade", "1 unidade", "so uma", "só uma", "so de 1", "só de 1", "fazer uma", "comprar um", "comprar uma"],
+      answer: "Sim! 😊 Produzimos pedidos a partir de 1 unidade."
+    },
+    {
+      keywords: ["minimo", "minima", "quantidade minima", "quantidade mínima", "pedido minimo"],
+      answer: "Não há quantidade mínima. 😊 Produzimos a partir de 1 unidade. Apenas pedidos no atacado possuem condições específicas."
+    },
+    {
+      keywords: ["atacado", "acima de 10", "comprar lote", "revenda", "lote", "vender", "desconto quantidade"],
+      answer: "Sim! 😊 Pedidos acima de 10 unidades possuem descontos especiais.\n\nPara fazer um orçamento de atacado, entre em contato via WhatsApp:\n(21) 4040-2224"
+    },
+    {
+      keywords: ["prazo", "producao", "produzir", "tempo para fazer", "confeccao", "prazo de producao", "fazer"],
+      answer: "Após a confirmação do pagamento, o prazo de produção de cada peça personalizada (desenho e gravação) é de 5 a 7 dias úteis."
+    },
+    {
+      keywords: ["urgente", "urgencia", "pressa", "rapido", "acelerar", "antecipar", "emergencia", "prazo curto"],
+      answer: "Sempre buscamos agilizar os pedidos! 😊 Porém seguimos o prazo padrão de produção de 5 a 7 dias úteis, além do prazo da transportadora."
+    },
+    {
+      keywords: ["entrega", "prazo de entrega", "quanto tempo", "demora", "chegar", "transporte", "correio", "sedex", "pac"],
+      answer: "O prazo de entrega varia conforme a sua região e a transportadora escolhida no checkout. Após postarmos seu pedido nos Correios/transportadora, o prazo corre por conta deles."
+    },
+    {
+      keywords: ["rastrear", "rastreio", "codigo de rastreio", "enviar rastreio", "acompanhar", "onde esta", "postagem"],
+      answer: "Assim que seu pedido for postado, nós enviaremos o código de rastreio oficial diretamente em seu e-mail cadastrado! 😊"
+    },
+    {
+      keywords: ["todo o brasil", "entrega brasil", "envia para", "meu estado", "enviam para", "enviar para", "frete para"],
+      answer: "Sim! 😊 Realizamos envios seguros para todo o território nacional."
+    },
+    {
+      keywords: ["valor do frete", "quanto é o frete", "frete gratis", "frete pago", "calcular frete", "custo do frete"],
+      answer: "O valor do frete é calculado automaticamente no checkout ou diretamente na página do produto inserindo seu CEP."
+    },
+    {
+      keywords: ["retirar", "retirada", "pessoalmente", "pegar", "brasilia", "retirar em", "busca", "df"],
+      answer: "Sim! Para retirada pessoalmente em Brasília (DF), por favor, combine os detalhes conosco antecipadamente pelo WhatsApp: (21) 4040-2224 antes de finalizar a compra."
+    },
+    {
+      keywords: ["formas de pagamento", "pagar", "pagamento", "boleto", "cartao", "pix", "aceita", "parcela", "credito"],
+      answer: "Aceitamos Pix, cartão de crédito (em até 10x) e boleto bancário.\n\nTodo o pagamento é processado com 100% de segurança via PAGBANK®."
+    },
+    {
+      keywords: ["desconto pix", "pix tem desconto", "desconto no pix", "pago no pix", "pagamento pix"],
+      answer: "Sim! 😊 Compras realizadas via Pix ganham automaticamente 10% de desconto no valor de todos os produtos do carrinho."
+    },
+    {
+      keywords: ["parcelar", "parcelamento", "parcelas", "vezes", "dividir", "credito 10x"],
+      answer: "Sim! 😊 Parcelamos em até 10x no cartão de crédito, sendo em até 3x sem juros."
+    },
+    {
+      keywords: ["quebrado", "defeito", "avaria", "danificado", "estragou", "quebrou", "amassou", "riscado"],
+      answer: "Fique tranquilo(a)! Se houver avarias no transporte ou qualquer defeito do ateliê, garantimos a substituição sem custos. Entre em contato em até 7 dias no e-mail: sac@usegat.com"
+    },
+    {
+      keywords: ["trocar personalizado", "troca de personalizado", "trocar garrafa", "trocar caneca", "troca"],
+      answer: "Por serem peças únicas e sob medida, trocas de itens personalizados são realizadas exclusivamente em caso de defeito de fabricação ou danos no transporte relatados em até 7 dias corridos."
+    },
+    {
+      keywords: ["devolver", "arrependi", "cancelar", "desistir", "devolucao", "arrependimento"],
+      answer: "Conforme o Artigo 49 do Código de Defesa do Consumidor, produtos sob medida e totalmente personalizados não possuem direito de devolução por arrependimento, por serem inviáveis para revenda."
+    },
+    {
+      keywords: ["desbota", "sai", "lava louca", "lavar", "durabilidade", "qualidade", "microondas", "micro-ondas"],
+      answer: "Não desbota e não sai! 😊 Nossas gravações a laser e impressões de cerâmica são de altíssima qualidade. Recomendamos apenas lavar com o lado macio da bucha, evitar produtos abrasivos e evitar lava-louças para durabilidade eterna."
+    }
+  ];
+
+  let bestMatch = null;
+  let maxScore = 0;
+
+  for (const rule of rules) {
+    let score = 0;
+    for (const kw of rule.keywords) {
+      const kwNormalized = normalize(kw);
+      if (text.includes(kwNormalized)) {
+        score += kwNormalized.split(" ").length;
+      }
+    }
+    if (score > maxScore) {
+      maxScore = score;
+      bestMatch = rule;
+    }
+  }
+
+  if (bestMatch && maxScore > 0) {
+    return bestMatch.answer;
+  }
+
+  return "Dúvida muito específica 😊\nPor favor entre em contato com nosso suporte direto pelo WhatsApp para que possamos te ajudar perfeitamente:\n\nWhatsApp: (21) 4040-2224";
 }

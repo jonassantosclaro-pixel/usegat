@@ -35,6 +35,8 @@ export default function Home() {
   const [loading, setLoading] = useState(true);
   const { user } = useAuth();
   const { addItem } = useCart();
+  const [settings, setSettings] = useState<any>(null);
+  const [activeFaq, setActiveFaq] = useState<number | null>(null);
 
   // Wishlist state
   const [wishlist, setWishlist] = useState<string[]>([]);
@@ -54,7 +56,7 @@ export default function Home() {
     if (saved) setWishlist(JSON.parse(saved));
 
     const q = query(collection(db, 'products'), limit(20));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribeProducts = onSnapshot(q, (snapshot) => {
       const fetched = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Product));
       if (fetched.length === 0) {
         setProducts(FALLBACK_PRODUCTS);
@@ -68,7 +70,17 @@ export default function Home() {
       setLoading(false);
     });
 
-    return () => unsubscribe();
+    // Load settings in real-time
+    const unsubscribeSettings = onSnapshot(collection(db, 'settings'), (qSettings) => {
+      if (!qSettings.empty) {
+        setSettings(qSettings.docs[0].data());
+      }
+    });
+
+    return () => {
+      unsubscribeProducts();
+      unsubscribeSettings();
+    };
   }, []);
 
   const toggleWishlist = (id: string, e: React.MouseEvent) => {
@@ -121,17 +133,26 @@ export default function Home() {
         <div className="max-w-2xl relative z-10 space-y-6 md:space-y-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#B48A4E]/10 rounded-full border border-[#B48A4E]/20">
             <span className="animate-pulse w-2 h-2 rounded-full bg-[#B48A4E]" />
-            <span className="text-[9px] font-black uppercase tracking-widest text-[#8C6A3B]">Exclusividade 'Sua História'</span>
+            <span className="text-[9px] font-black uppercase tracking-widest text-[#8C6A3B]">{settings?.banner_img_1_tag || "Exclusividade 'Sua História'"}</span>
           </div>
           
           <h1 className="text-4xl md:text-7xl font-serif text-brand-black tracking-tight leading-tight md:leading-[1.1]">
-            Não estampamos apenas, <br />
-            <span className="font-serif italic font-bold border-b-4 border-brand-gold/30">contamos histórias</span>
+            {settings?.banner_title ? (
+              <span>
+                {settings.banner_title.replace(settings.banner_bold_text || "contamos histórias", "")}
+                <br />
+                <span className="font-serif italic font-bold border-b-4 border-brand-gold/30">{settings.banner_bold_text || "contamos histórias"}</span>
+              </span>
+            ) : (
+              <span>
+                Não estampamos apenas, <br />
+                <span className="font-serif italic font-bold border-b-4 border-brand-gold/30">contamos histórias</span>
+              </span>
+            )}
           </h1>
 
           <p className="text-sm md:text-lg text-brand-gray font-medium leading-relaxed max-w-xl">
-            Bem-vindo à <span className="font-bold text-brand-primary">USE GAT</span>. Somos especialistas em transformar suas memórias,
-            esportes preferidos, comidas do coração e datas marcantes em canecas premium e garrafas térmicas com gravação permanente sob medida.
+            {settings?.banner_desc || "Bem-vindo à USE GAT. Somos especialistas em transformar suas memórias, esportes preferidos, comidas do coração e datas marcantes em canecas premium e garrafas térmicas com gravação permanente sob medida."}
           </p>
 
           <div className="flex flex-wrap gap-4 pt-4">
@@ -139,7 +160,7 @@ export default function Home() {
               to="/categoria/garrafas-termicas" 
               className="bg-brand-primary text-white px-10 py-5 rounded-full font-black uppercase tracking-[0.15em] text-xs hover:bg-brand-primary-light transition-all transform hover:scale-105 shadow-xl hover:shadow-brand-primary/20"
             >
-              CRIAR MINHA GARRAFA
+              {settings?.banner_btn_text || "CRIAR MINHA GARRAFA"}
             </Link>
             <a 
               href="#rastreio"
@@ -155,28 +176,28 @@ export default function Home() {
           {/* Main frame */}
           <div className="bg-white p-4 shadow-2xl border border-stone-150 transform rotate-[-3deg] w-72 sm:w-[320px] relative z-10 transition-transform hover:rotate-0 duration-500">
             <img 
-              src="https://i.postimg.cc/hv2SWwmj/704945826-1785809935732333-1325427837227963059-n.jpg" 
+              src={settings?.banner_img_1 || "https://i.postimg.cc/hv2SWwmj/704945826-1785809935732333-1325427837227963059-n.jpg"} 
               alt="Modelo Sua História" 
               className="w-full h-auto object-cover aspect-[4/5] rounded"
             />
             <div className="pt-4 pb-2 text-center">
-              <p className="font-handwriting text-xl text-brand-gold">Garrafa Sua História</p>
+              <p className="font-handwriting text-xl text-brand-gold">{settings?.banner_img_1_name || "Garrafa Sua História"}</p>
               <p className="text-[10px] font-black uppercase tracking-widest text-[#4D1D54]/60 mt-1">100% Personalizado Para Você</p>
             </div>
             
             <div className="absolute -top-4 -left-4 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full border border-stone-250 text-[8px] font-black text-brand-primary uppercase tracking-widest shadow rotate-[-12deg]">
-              🌿 Rústico & Boho Chic
+              {settings?.banner_img_1_tag || "🌿 Rústico & Boho Chic"}
             </div>
           </div>
           
           {/* Secondary element behind */}
           <div className="bg-white p-3 shadow-xl border border-stone-150 transform rotate-[8deg] w-48 sm:w-60 absolute right-4 bottom-2 z-0 opacity-80 hidden sm:block hover:opacity-100 transition-opacity">
             <img 
-              src="https://i.postimg.cc/bv3TD1vJ/Whats-App-Image-2026-05-15-at-16-10-17-(1).jpg" 
+              src={settings?.banner_img_2 || "https://i.postimg.cc/bv3TD1vJ/Whats-App-Image-2026-05-15-at-16-10-17-(1).jpg"} 
               alt="Canecas Boho" 
               className="w-full h-auto object-cover aspect-square rounded"
             />
-            <p className="font-handwriting text-lg text-center text-brand-black mt-2">Caneca Minimalista</p>
+            <p className="font-handwriting text-lg text-center text-brand-black mt-2">{settings?.banner_img_2_name || "Caneca Minimalista"}</p>
           </div>
         </div>
       </section>
@@ -250,6 +271,47 @@ export default function Home() {
             </motion.div>
           </div>
         )}
+      </section>
+
+      {/* Quem Somos Section */}
+      <section className="py-20 bg-white border-b border-brand-gold/10 relative overflow-hidden">
+        <div className="absolute top-1/2 right-0 w-80 h-80 rounded-full bg-brand-pink-light/40 opacity-55 filter blur-3xl pointer-events-none" />
+        <div className="max-w-5xl mx-auto px-6 grid grid-cols-1 md:grid-cols-2 gap-12 items-center">
+          <div className="relative">
+            <div className="w-full aspect-[4/3] rounded-[40px] overflow-hidden border-4 border-white shadow-xl bg-[#FAF7F2]">
+              <img 
+                src={settings?.about_image || "https://i.postimg.cc/bv3TD1vJ/Whats-App-Image-2026-05-15-at-16-10-17-(1).jpg"} 
+                alt="Sobre Nós Ateliê" 
+                className="w-full h-full object-cover"
+              />
+            </div>
+            <div className="absolute -bottom-6 -right-6 bg-brand-primary text-white p-6 rounded-[30px] shadow-lg hidden sm:block">
+              <p className="font-handwriting text-2xl text-brand-gold">Feito com Amor</p>
+              <p className="text-[9px] font-black uppercase tracking-widest mt-1">100% Permanente</p>
+            </div>
+          </div>
+          <div className="space-y-6">
+            <span className="text-brand-gold font-handwriting text-2xl">Quem Somos</span>
+            <h2 className="text-4xl font-serif font-black text-brand-black leading-tight italic">
+              {settings?.about_title || "Nossa Essência Boho & Afeto"}
+            </h2>
+            <div className="w-16 h-1 bg-brand-gold rounded-full"></div>
+            <p className="text-sm text-brand-gray font-medium leading-relaxed">
+              {settings?.about_text || "A USE GAT nasceu do desejo de eternizar momentos cotidianos em recipientes que contam histórias reais. Cada peça nossa combina o design rústico Boho com alta tecnologia de gravação permanente a laser para que seus goles sejam repletos de significado."}
+            </p>
+            <div className="pt-4 flex gap-4">
+              <a 
+                href={`https://wa.me/${settings?.whatsapp || '552140402224'}`} 
+                target="_blank" 
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 bg-[#FAF7F8] hover:bg-brand-primary hover:text-white border border-brand-gold/25 px-6 py-3.5 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-sm"
+              >
+                <PhoneCall className="w-4 h-4 text-brand-gold" />
+                Falar com Ateliê
+              </a>
+            </div>
+          </div>
+        </div>
       </section>
 
       {/* 3. Lançamentos GRID & Auto Carousel */}
@@ -354,6 +416,47 @@ export default function Home() {
               </div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* Como Personalizar Seu Pedido Section */}
+      <section className="py-24 bg-[#F4EFE7]/40 border-y border-brand-gold/10">
+        <div className="max-w-7xl mx-auto px-6 lg:px-10 text-center">
+          <div className="mb-16 space-y-2">
+            <span className="text-brand-gold font-handwriting text-2xl">Artesanal & Sob Medida</span>
+            <h2 className="text-4xl md:text-5xl font-serif font-black text-brand-black">Como Personalizar seu Pedido</h2>
+            <div className="w-24 h-1 bg-brand-gold mx-auto rounded-full mt-4" />
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-12 max-w-5xl mx-auto">
+            {[
+              {
+                num: "01",
+                title: settings?.custom_step_1_title || "Escolha o Produto",
+                desc: settings?.custom_step_1_desc || "Selecione o modelo ideal de Garrafa Térmica ou Caneca Premium do nosso catálogo rústico boho."
+              },
+              {
+                num: "02",
+                title: settings?.custom_step_2_title || "Preencha a História",
+                desc: settings?.custom_step_2_desc || "Preencha os dados de texto e selecione fotos/desenhos marcantes na página de customização."
+              },
+              {
+                num: "03",
+                title: settings?.custom_step_3_title || "Produção e Afeto",
+                desc: settings?.custom_step_3_desc || "Nossos ilustradores montam o layout perfeito e gravamos a laser de forma permanente."
+              }
+            ].map((step, i) => (
+              <div key={i} className="bg-white p-8 rounded-[40px] border border-brand-gold/15 shadow-sm text-center space-y-4 hover:shadow-md transition-shadow relative">
+                <span className="absolute -top-6 left-1/2 -translate-x-1/2 w-12 h-12 rounded-full bg-brand-primary text-white flex items-center justify-center font-serif font-black text-xs md:text-sm">
+                  {step.num}
+                </span>
+                <h4 className="font-serif font-black text-brand-black text-xl pt-4">{step.title}</h4>
+                <p className="text-xs text-brand-gray font-medium leading-relaxed uppercase tracking-wider">
+                  {step.desc}
+                </p>
+              </div>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -521,6 +624,80 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Video Showcase Section */}
+      <section className="py-24 bg-white border-y border-brand-gold/10 relative overflow-hidden">
+        <div className="absolute top-0 left-0 w-64 h-64 rounded-full bg-brand-pink-light/30 opacity-50 filter blur-3xl pointer-events-none" />
+        <div className="max-w-4xl mx-auto px-6 text-center space-y-8 relative z-10 w-full">
+          <div className="space-y-2">
+            <span className="text-brand-gold font-handwriting text-2xl">Nosso Canal e Produção</span>
+            <h2 className="text-3xl md:text-5xl font-serif font-black text-brand-black">{settings?.video_title_1 || "Gravação a Laser Permanente"}</h2>
+            <p className="text-xs text-brand-gray font-medium uppercase tracking-widest max-w-md mx-auto">{settings?.video_desc_1 || "Assista ao processo computadorizado milimétrico em nosso ateliê"}</p>
+          </div>
+          
+          <div className="aspect-video w-full rounded-[40px] overflow-hidden shadow-2xl border-4 border-white ring-1 ring-brand-gold/15 relative bg-[#FAF7F2]">
+            {settings?.video_url_1 ? (
+              <iframe
+                className="w-full h-full"
+                src={settings.video_url_1.includes("watch?v=") ? settings.video_url_1.replace("watch?v=", "embed/") : settings.video_url_1}
+                title={settings?.video_title_1 || "Vídeo GAT"}
+                frameBorder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowFullScreen
+              />
+            ) : (
+              <div className="w-full h-full flex flex-col items-center justify-center p-8 text-center text-brand-gray space-y-4">
+                <Coffee className="w-12 h-12 text-brand-gold" />
+                <p className="text-sm font-bold uppercase tracking-widest text-[#8C6A3B]">Nenhum vídeo publicado ainda</p>
+                <p className="text-xs max-w-xs leading-relaxed">Insira uma URL de vídeo no painel para exibir seu trabalho aqui em tempo real!</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Dúvidas Frequentes FAQ Section */}
+      <section className="py-24 bg-[#FAF7F8]/40 border-b border-brand-gold/10" id="duvidas-frequentes">
+        <div className="max-w-4xl mx-auto px-6">
+          <div className="text-center mb-16 space-y-2">
+            <span className="text-brand-gold font-handwriting text-2xl">Atendimento & Dúvidas</span>
+            <h2 className="text-4xl font-serif font-black text-brand-black">Dúvidas Frequentes</h2>
+            <p className="text-xs text-brand-gray font-medium uppercase tracking-widest">Tudo o que você precisa saber sobre o seu presente afetivo</p>
+            <div className="w-16 h-1 bg-brand-gold mx-auto rounded-full mt-4" />
+          </div>
+
+          <div className="space-y-4 max-w-3xl mx-auto">
+            {(settings?.faqs || [
+              { q: "Qual o prazo de envio?", a: "Nosso prazo normal de produção Boho é de 5 a 7 dias úteis antes do despacho." },
+              { q: "A gravação a laser é definitiva?", a: "Sim! A gravação é permanente e resistente, pois remove a pintura revelando o aço cirúrgico." },
+              { q: "Como envio meus dados de personalização?", a: "Diretamente na página de finalização da compra ou após o fechamento via WhatsApp." },
+              { q: "Posso colocar nome e sobrenome?", a: "Com certeza, adaptamos o tamanho das letras para que fique perfeitamente harmonioso." }
+            ]).map((faq: any, i: number) => (
+              <div 
+                key={i} 
+                className="bg-white rounded-3xl border border-brand-gold/15 overflow-hidden transition-all duration-300 shadow-sm"
+              >
+                <button
+                  onClick={() => setActiveFaq(activeFaq === i ? null : i)}
+                  className="w-full text-left px-8 py-6 flex justify-between items-center bg-white hover:bg-brand-pink-light/30 transition-colors"
+                >
+                  <span className="font-serif font-black text-brand-black text-base md:text-lg">
+                    {faq.q}
+                  </span>
+                  <span className={`text-brand-gold font-bold text-xl transition-transform duration-300 ${activeFaq === i ? 'rotate-180' : ''}`}>
+                    ▾
+                  </span>
+                </button>
+                {activeFaq === i && (
+                  <div className="px-8 pb-6 text-sm text-brand-gray font-medium leading-relaxed border-t border-brand-pink-medium/10 pt-4 bg-[#FAF7F8]/30">
+                    {faq.a}
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
       {/* 7. Instagram Highlights Section */}
       <section className="py-24 max-w-7xl mx-auto px-6 lg:px-10" id="instagram-section">
         <div className="text-center mb-16">
@@ -531,7 +708,7 @@ export default function Home() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-10">
-          {[
+          {(settings?.instagram_posts || [
             {
               title: "Coleção Sua História ✨",
               img: "https://i.postimg.cc/CxNgn95b/702751295-868314862239637-7807271768424170538-n.png",
@@ -556,7 +733,7 @@ export default function Home() {
               likes: "24.3k curtidas",
               desc: "Os bastidores da nossa embalagem rústica Boho que viralizaram: palha de trigo perfumada, raminho de flores secas e o nosso autêntico selo de cera real."
             }
-          ].map((post, i) => (
+          ]).map((post: any, i: number) => (
             <a 
               key={i} 
               href={post.link} 

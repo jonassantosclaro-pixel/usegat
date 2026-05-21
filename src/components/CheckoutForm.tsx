@@ -86,7 +86,26 @@ export default function CheckoutForm({ onProcess, totalProducts, onShippingUpdat
           estado: address.estado || ''
         }));
       } catch (error) {
-        console.error("Erro ao buscar CEP", error);
+        console.warn("Erro ao buscar CEP via backend, usando fallback ViaCEP direto:", error);
+        try {
+          const viaCepRes = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+          if (viaCepRes.ok) {
+            const data = await viaCepRes.json();
+            if (!data.erro) {
+              setFormData(prev => ({
+                ...prev,
+                rua: data.logradouro || '',
+                cidade: data.localidade || '',
+                estado: data.uf || ''
+              }));
+              const fallbackCost = 18.00;
+              setShippingCost(fallbackCost);
+              onShippingUpdate(fallbackCost);
+            }
+          }
+        } catch (fallbackError) {
+          console.error("Erro no fallback do CEP:", fallbackError);
+        }
       } finally {
         setCalculatingShipping(false);
       }
