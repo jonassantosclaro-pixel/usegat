@@ -1,18 +1,25 @@
 import React, { useState, useEffect } from 'react';
-import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, onSnapshot } from 'firebase/firestore';
+import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { useAuth } from '@/src/lib/AuthContext';
 import { Link } from 'react-router-dom';
-import { Plus, Trash2, Edit3, Package, Users, ShoppingCart as OrderIcon, Database, ArrowLeft } from 'lucide-react';
+import { Plus, Trash2, Edit3, Package, Users, ShoppingCart as OrderIcon, Database, ArrowLeft, Check, Search, RefreshCw, Ticket } from 'lucide-react';
 import { formatPrice } from '@/src/lib/utils';
+import { FALLBACK_PRODUCTS } from '@/src/lib/productsData';
 
 export default function AdminDashboard() {
   const { user, isAdmin, loading: authLoading, signInWithGoogle } = useAuth();
   const [products, setProducts] = useState<any[]>([]);
   const [orders, setOrders] = useState<any[]>([]);
   const [customers, setCustomers] = useState<any[]>([]);
+  const [coupons, setCoupons] = useState<any[]>([]);
+  const [newCouponCode, setNewCouponCode] = useState('');
+  const [newCouponType, setNewCouponType] = useState<'percentage' | 'value'>('percentage');
+  const [newCouponValue, setNewCouponValue] = useState(0);
+
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'customers' | 'settings'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'customers' | 'settings' | 'stock' | 'coupons'>('products');
+  const [stockSearch, setStockSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
   const [selectedOrder, setSelectedOrder] = useState<any>(null);
@@ -76,7 +83,33 @@ export default function AdminDashboard() {
     bling_api_url: 'https://api.bling.com.br',
     melhorenvio_token: '',
     melhorenvio_sandbox: true,
-    pagbank_token: ''
+    pagbank_token: '',
+
+    // Accordions (Sanfonas do Rodapé) Overrides
+    acc_use_gat_type: 'default',
+    acc_use_gat_text: '',
+    acc_use_gat_image: '',
+    acc_atendimento_type: 'default',
+    acc_atendimento_text: '',
+    acc_atendimento_image: '',
+    acc_quem_somos_type: 'default',
+    acc_quem_somos_text: '',
+    acc_quem_somos_image: '',
+    acc_como_personalizar_type: 'default',
+    acc_como_personalizar_text: '',
+    acc_como_personalizar_image: '',
+    acc_duvidas_frequentes_type: 'default',
+    acc_duvidas_frequentes_text: '',
+    acc_duvidas_frequentes_image: '',
+    acc_politicas_termos_type: 'default',
+    acc_politicas_termos_text: '',
+    acc_politicas_termos_image: '',
+    acc_pagamento_type: 'default',
+    acc_pagamento_text: '',
+    acc_pagamento_image: '',
+    acc_seguro_type: 'default',
+    acc_seguro_text: '',
+    acc_seguro_image: '',
   });
   const [newProduct, setNewProduct] = useState({
     name: '',
@@ -92,6 +125,7 @@ export default function AdminDashboard() {
     detailedDescription: '',
     stock: 0
   });
+  const [uploadingProductImage, setUploadingProductImage] = useState(false);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -120,26 +154,120 @@ export default function AdminDashboard() {
       console.error("Customers error:", error);
     });
 
-    // Settings Real-time
-    const unsubscribeSettings = onSnapshot(collection(db, 'settings'), (snapshot) => {
+    // Coupons Real-time
+    const unsubscribeCoupons = onSnapshot(collection(db, 'coupons'), (snapshot) => {
+      setCoupons(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      console.error("Coupons error:", error);
+    });
+
+     // Merge any loose settings documents into a single 'global' document and load it once
+    let isMounted = true;
+    getDocs(collection(db, 'settings')).then(async (snapshot) => {
       if (!snapshot.empty) {
-        const data = snapshot.docs[0].data();
-        setSettings((prev: any) => ({
-          ...prev,
-          ...data,
-          faqs: data.faqs && data.faqs.length ? data.faqs : prev.faqs,
-          instagram_posts: data.instagram_posts && data.instagram_posts.length ? data.instagram_posts : prev.instagram_posts
-        }));
+        let globalDoc = snapshot.docs.find(d => d.id === 'global');
+        if (!globalDoc) {
+          // No 'global' document yet, we will write to 'global' using the first available settings doc
+          const firstData = snapshot.docs[0].data();
+          await setDoc(doc(db, 'settings', 'global'), firstData);
+          globalDoc = { data: () => firstData } as any;
+          console.log("Migrada primeira configuração para 'global'");
+        }
+        
+        if (isMounted) {
+          const data = globalDoc.data();
+          setSettings((prev: any) => {
+            const merged = { ...prev, ...data };
+            // Replace any null/undefined with empty string to keep inputs controlled
+            for (const key of Object.keys(merged)) {
+              if (merged[key] === null || merged[key] === undefined) {
+                merged[key] = '';
+              }
+            }
+            if (data.faqs && data.faqs.length) {
+              merged.faqs = data.faqs;
+            } else {
+              merged.faqs = prev.faqs;
+            }
+            if (data.instagram_posts && data.instagram_posts.length) {
+              merged.instagram_posts = data.instagram_posts;
+            } else {
+              merged.instagram_posts = prev.instagram_posts;
+            }
+            return merged;
+          });
+        }
+
+        // Clean up duplicate settings documents
+        for (const docObj of snapshot.docs) {
+          if (docObj.id !== 'global') {
+            await deleteDoc(doc(db, 'settings', docObj.id));
+            console.log(`Deletada configuração duplicada: ${docObj.id}`);
+          }
+        }
+      } else {
+        // Since snapshot is empty, save the initial defaults to 'global'
+        await setDoc(doc(db, 'settings', 'global'), settings);
+        console.log("Criadas configurações padrão iniciais em 'global'");
       }
+    }).catch(err => {
+      console.error("Erro carregando ou limpando configurações:", err);
     });
 
     return () => {
+      isMounted = false;
       unsubscribeProducts();
       unsubscribeOrders();
       unsubscribeCustomers();
-      unsubscribeSettings();
+      unsubscribeCoupons();
     };
   }, [isAdmin]);
+
+  const handleAddCoupon = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCouponCode.trim() || newCouponValue <= 0) {
+      alert("Por favor, preencha o código do cupom e o valor do desconto!");
+      return;
+    }
+    const codeUpper = newCouponCode.trim().toUpperCase();
+    try {
+      await addDoc(collection(db, 'coupons'), {
+        code: codeUpper,
+        type: newCouponType,
+        value: Number(newCouponValue),
+        active: true,
+        createdAt: new Date().toISOString()
+      });
+      setNewCouponCode('');
+      setNewCouponValue(0);
+      alert("Cupom criado com sucesso!");
+    } catch (error: any) {
+      console.error("Error creating coupon:", error);
+      alert("Erro ao criar cupom: " + error.message);
+    }
+  };
+
+  const handleDeleteCoupon = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir este cupom?")) return;
+    try {
+      await deleteDoc(doc(db, 'coupons', id));
+      alert("Cupom excluído com sucesso!");
+    } catch (error: any) {
+      console.error("Error deleting coupon:", error);
+      alert("Erro ao excluir cupom: " + error.message);
+    }
+  };
+
+  const handleToggleCouponActive = async (id: string, currentStatus: boolean) => {
+    try {
+      await updateDoc(doc(db, 'coupons', id), {
+        active: !currentStatus
+      });
+    } catch (error: any) {
+      console.error("Error updating coupon:", error);
+      alert("Erro ao atualizar status do cupom: " + error.message);
+    }
+  };
 
   if (authLoading) return (
     <div className="min-h-[60vh] flex items-center justify-center">
@@ -176,17 +304,205 @@ export default function AdminDashboard() {
   const handleSaveSettings = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      // Helper to clean undefined values recursively to avoid Firestore invalid data errors
+      const cleanPayload = (obj: any): any => {
+        if (obj === undefined || obj === null) return '';
+        if (Array.isArray(obj)) {
+          return obj.map(item => cleanPayload(item));
+        }
+        if (typeof obj === 'object') {
+          const cleaned: any = {};
+          for (const key of Object.keys(obj)) {
+            const val = obj[key];
+            if (val !== undefined && val !== null) {
+              cleaned[key] = cleanPayload(val);
+            } else {
+              cleaned[key] = '';
+            }
+          }
+          return cleaned;
+        }
+        return obj;
+      };
+
+      const sanitizedSettings = cleanPayload(settings);
+
+      // Direct update or set to document with ID 'global'
+      await setDoc(doc(db, 'settings', 'global'), sanitizedSettings);
+
+      // Verify and remove any duplicate collection documents that aren't 'global'
       const q = await getDocs(collection(db, 'settings'));
-      if (q.empty) {
-        await addDoc(collection(db, 'settings'), settings);
-      } else {
-        await updateDoc(doc(db, 'settings', q.docs[0].id), settings);
+      for (const d of q.docs) {
+        if (d.id !== 'global') {
+          await deleteDoc(doc(db, 'settings', d.id));
+        }
       }
-      alert('Configurações salvas!');
-    } catch (error) {
+      alert('Configurações salvas e propagadas para todo o site em tempo real!');
+    } catch (error: any) {
+      console.error("Firestore settings save error:", error);
       handleFirestoreError(error, OperationType.WRITE, 'settings');
-      alert('Erro ao salvar configurações');
+      alert(`Erro ao salvar configurações: ${error.message || error}`);
     }
+  };
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>, fieldName: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Check size first: warn if file is huge (over 5MB), but let's compress anyway!
+    if (file.size > 5 * 1024 * 1024) {
+      alert("A imagem selecionada é muito grande! Escolha um arquivo menor de 5MB.");
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const base64String = uploadEvent.target?.result as string;
+      
+      // Early preview/feedback
+      setSettings((prev: any) => ({
+        ...prev,
+        [fieldName]: base64String
+      }));
+
+      // Optimize and compress the selection using a Canvas
+      const img = new Image();
+      img.src = base64String;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        // Scale to a maximum bounding box of 1200px
+        const MAX_SIZE = 1200;
+        if (width > MAX_SIZE || height > MAX_SIZE) {
+          if (width > height) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          } else {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          // Compress beautifully as high quality JPEG (75%)
+          const optimizedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+          
+          // Send to server to write to disk
+          fetch('/api/upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ image: optimizedBase64 }),
+          })
+          .then(res => {
+            if (!res.ok) throw new Error("Falha no upload");
+            return res.json();
+          })
+          .then(data => {
+            setSettings((prev: any) => ({
+              ...prev,
+              [fieldName]: data.imageUrl
+            }));
+          })
+          .catch(err => {
+            console.error("Local upload failed, keeping base64 as fallback:", err);
+            setSettings((prev: any) => ({
+              ...prev,
+              [fieldName]: optimizedBase64
+            }));
+          });
+        }
+      };
+    };
+    reader.onerror = (error) => {
+      console.error("FileReader error:", error);
+      alert("Erro ao ler arquivo da imagem.");
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleProductImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 5 * 1024 * 1024) {
+      alert("A imagem selecionada é muito grande! Escolha um arquivo menor de 5MB.");
+      return;
+    }
+
+    setUploadingProductImage(true);
+
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      const base64String = uploadEvent.target?.result as string;
+
+      const img = new Image();
+      img.src = base64String;
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        
+        const MAX_SIZE = 1200;
+        if (width > MAX_SIZE || height > MAX_SIZE) {
+          if (width > height) {
+            height = Math.round((height * MAX_SIZE) / width);
+            width = MAX_SIZE;
+          } else {
+            width = Math.round((width * MAX_SIZE) / height);
+            height = MAX_SIZE;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const optimizedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+          
+          fetch('/api/upload', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ image: optimizedBase64 }),
+          })
+          .then(res => {
+            if (!res.ok) throw new Error("Falha no upload");
+            return res.json();
+          })
+          .then(data => {
+            setNewProduct((prev: any) => ({
+              ...prev,
+              imageUrl: data.imageUrl
+            }));
+            setUploadingProductImage(false);
+          })
+          .catch(err => {
+            console.error("Local upload failed, keeping base64 as fallback:", err);
+            setNewProduct((prev: any) => ({
+              ...prev,
+              imageUrl: optimizedBase64
+            }));
+            setUploadingProductImage(false);
+          });
+        }
+      };
+    };
+    reader.onerror = (error) => {
+      console.error("FileReader error:", error);
+      alert("Erro ao ler arquivo da imagem.");
+      setUploadingProductImage(false);
+    };
+    reader.readAsDataURL(file);
   };
 
   const updateOrderStatus = async (orderId: string, status: string) => {
@@ -300,7 +616,14 @@ export default function AdminDashboard() {
   };
 
   const handleDelete = async (id: string) => {
-    if (confirm('Tem certeza?')) {
+    let proceed = false;
+    try {
+      proceed = window.confirm('Tem certeza que deseja excluir este produto?');
+    } catch (e) {
+      // confirm is blocked inside cross-origin iframe sandbox in AI Studio, safe fallback to true
+      proceed = true;
+    }
+    if (proceed) {
       try {
         await deleteDoc(doc(db, 'products', id));
       } catch (error) {
@@ -309,12 +632,59 @@ export default function AdminDashboard() {
     }
   };
 
+  const handleUpdateStock = async (id: string, newStock: number) => {
+    try {
+      const stockValue = Math.max(0, newStock);
+      await updateDoc(doc(db, 'products', id), {
+        stock: stockValue
+      });
+    } catch (error) {
+      console.error("Error updating stock:", error);
+      handleFirestoreError(error, OperationType.UPDATE, `products/${id}`);
+    }
+  };
+
+  const handleSyncVitrine = async () => {
+    setLoading(true);
+    try {
+      let count = 0;
+      for (const prod of FALLBACK_PRODUCTS) {
+        // Check if product already exists (by SKU)
+        const exists = products.some(p => p.sku === prod.sku);
+        if (!exists) {
+          // Add newly synchronized product
+          await addDoc(collection(db, 'products'), {
+            name: prod.name,
+            sku: prod.sku,
+            price: prod.price,
+            imageUrl: prod.imageUrl,
+            category: prod.category,
+            subcategory: prod.subcategory || '',
+            description: prod.description,
+            detailedDescription: prod.detailedDescription || '',
+            customizable: prod.customizable,
+            isSuaHistoria: prod.isSuaHistoria || false,
+            stock: 50, // Initial default stock
+            createdAt: new Date().toISOString()
+          });
+          count++;
+        }
+      }
+      alert(`Sincronização concluída! ${count} novos produtos da vitrine foram cadastrados e integrados com sucesso.`);
+    } catch (error) {
+      console.error("Error syncing vitrine:", error);
+      alert('Erro ao sincronizar produtos da vitrine.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const handleSeedData = async () => {
     if (!confirm('Isso irá cadastrar automaticamente todas as categorias e subcategorias solicitadas. Continuar?')) return;
     
     setLoading(true);
     try {
-      const thermalDescription = "A parede dupla de isolamento mantém suas bebidas favoritas quentes ou frias por mais tempo, ideal para qualquer aventura ou rotina diária. Perfeita para os amantes de design único ou para presentear alguém especial, esta garrafa une o encanto visual à praticidade, tornando cada gole uma experiência estelar.\n\n<img src=\"https://i.postimg.cc/pTMMv8nk/Whats-App-Image-2026-05-15-at-11-51-00.jpg\" alt=\"Detalhes da Garrafa Térmica\" />\n\n<img src=\"https://i.postimg.cc/yYZhgZJg/Whats-App-Image-2026-05-15-at-11-53-27.jpg\" alt=\"Resistência da Garrafa Térmica\" />";
+      const thermalDescription = "A parede dupla de isolamento mantém suas bebidas favoritas quentes ou frias por mais tempo, ideal para qualquer aventura ou rotina diária. Perfeita para os amantes de design único ou para presentear alguém especial, esta garrafa une o encanto visual à praticidade, tornando cada gole uma experiência estelar.\n\n<img src=\"/imagens/admin-detail-1.jpg\" alt=\"Detalhes da Garrafa Térmica\" />\n\n<img src=\"/imagens/admin-detail-2.jpg\" alt=\"Resistência da Garrafa Térmica\" />";
       
       const seedProducts = [
         // GARRAFAS TÉRMICAS
@@ -379,7 +749,9 @@ export default function AdminDashboard() {
           <div className="flex gap-4 mt-6">
             {[
               { id: 'products', label: 'Produtos', icon: Package },
+              { id: 'stock', label: 'Estoque & Sincronização', icon: Database },
               { id: 'orders', label: `Pedidos (${orders.length})`, icon: OrderIcon },
+              { id: 'coupons', label: `Cupons (${coupons.length})`, icon: Ticket },
               { id: 'customers', label: `Clientes (${customers.length})`, icon: Users },
               { id: 'settings', label: 'Configurações', icon: Database },
             ].map((tab) => (
@@ -397,6 +769,13 @@ export default function AdminDashboard() {
         {activeTab === 'products' && (
           <div className="flex gap-4">
             <button 
+              onClick={handleSyncVitrine}
+              className="bg-[#FAF7F8] text-brand-pink-strong px-6 py-4 rounded-full font-black uppercase tracking-widest text-[9px] hover:bg-brand-pink-light hover:scale-105 transition-all flex items-center gap-2 border border-brand-pink-light shadow-sm"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Sincronizar Vitrine
+            </button>
+            <button 
               onClick={handleSeedData}
               className="bg-white text-brand-gray px-6 py-4 rounded-full font-black uppercase tracking-widest text-[9px] hover:bg-[#FAF7F8] transition-all flex items-center gap-2 border border-brand-pink-light"
             >
@@ -404,11 +783,39 @@ export default function AdminDashboard() {
               Resetar Categorias
             </button>
             <button 
-              onClick={() => setShowAddModal(true)}
+              onClick={() => {
+                setEditingProduct(null);
+                setNewProduct({
+                  name: '',
+                  description: '',
+                  price: 0,
+                  imageUrl: '',
+                  category: 'garrafas-termicas',
+                  subcategory: '',
+                  customizable: false,
+                  hasNameAndSurname: false,
+                  isSuaHistoria: false,
+                  sku: '',
+                  detailedDescription: '',
+                  stock: 0
+                });
+                setShowAddModal(true);
+              }}
               className="bg-brand-gold text-white px-8 py-4 rounded-full font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-transform flex items-center shadow-lg"
             >
               <Plus className="w-4 h-4 mr-3" />
               Novo Produto
+            </button>
+          </div>
+        )}
+        {activeTab === 'stock' && (
+          <div className="flex gap-4">
+            <button 
+              onClick={handleSyncVitrine}
+              className="bg-brand-pink-light text-brand-pink-strong px-6 py-4 rounded-full font-black uppercase tracking-widest text-[9px] hover:bg-[#FAF7F8] transition-all flex items-center gap-2 border border-brand-pink-light shadow-sm"
+            >
+              <RefreshCw className="w-3 h-3" />
+              Sincronizar Vitrine
             </button>
           </div>
         )}
@@ -463,6 +870,117 @@ export default function AdminDashboard() {
                     </td>
                   </tr>
                 ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      ) : activeTab === 'stock' ? (
+        <div className="bg-white rounded-[40px] p-8 shadow-sm border border-brand-pink-light">
+          <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
+            <div>
+              <h2 className="text-xl font-serif font-black text-brand-black italic">Sincronização & Controle de Estoque</h2>
+              <p className="text-xs text-brand-gray font-medium mt-1">Aumente ou diminua as quantidades dos produtos. O estoque diminui automaticamente após cada venda.</p>
+            </div>
+            
+            {/* Quick search */}
+            <div className="relative w-full md:w-64 flex items-center">
+              <input 
+                type="text" 
+                placeholder="Buscar por SKU ou Nome..." 
+                value={stockSearch}
+                onChange={(e) => setStockSearch(e.target.value)}
+                className="w-full bg-[#FAF7F8] rounded-full pl-10 pr-5 py-3 text-xs font-semibold text-brand-black border border-brand-pink-light focus:outline-none focus:border-brand-gold shadow-inner"
+              />
+              <Search className="w-4 h-4 text-[#B48A4E] absolute left-3.5" />
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left">
+              <thead>
+                <tr className="border-b border-brand-pink-light pb-4">
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-[#B48A4E]">Imagem</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-[#B48A4E]">Produto</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-[#B48A4E]">SKU</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-[#B48A4E]">Categoria</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-[#B48A4E]">Status</th>
+                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-[#B48A4E] text-center">Quantidade em Estoque</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-brand-pink-light/30">
+                {products
+                  .filter(p => {
+                    const term = stockSearch.toLowerCase();
+                    return p.name.toLowerCase().includes(term) || (p.sku && p.sku.toLowerCase().includes(term));
+                  })
+                  .map((p) => {
+                    const currentStock = p.stock !== undefined ? p.stock : 0;
+                    return (
+                      <tr key={p.id} className="group hover:bg-[#FAF7F8] transition-colors">
+                        <td className="py-6">
+                          <img src={p.imageUrl} alt={p.name} className="w-12 h-12 object-contain rounded-xl bg-white border border-brand-pink-light p-1" />
+                        </td>
+                        <td className="py-6">
+                          <p className="font-bold text-sm text-brand-black">{p.name}</p>
+                          {p.customizable && <span className="text-[7px] font-black uppercase tracking-widest text-[#4D1D54] mt-1 block">★ Personalizável</span>}
+                        </td>
+                        <td className="py-6">
+                          <span className="text-[10px] font-mono font-black text-brand-pink-strong">{p.sku || '-'}</span>
+                        </td>
+                        <td className="py-6">
+                          <div className="flex flex-col">
+                            <span className="text-[9px] font-black uppercase tracking-widest text-brand-gold">{p.category}</span>
+                            <span className="text-[8px] font-bold text-brand-gray uppercase opacity-60 tracking-wider">{p.subcategory || '-'}</span>
+                          </div>
+                        </td>
+                        <td className="py-6">
+                          {currentStock === 0 ? (
+                            <span className="bg-red-50 text-red-700 border border-red-200 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Sem Estoque</span>
+                          ) : currentStock <= 5 ? (
+                            <span className="bg-amber-50 text-amber-700 border border-amber-200 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Estoque Baixo ({currentStock})</span>
+                          ) : (
+                            <span className="bg-[#E8F5E9] text-green-700 border border-green-200 px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest">Disponível</span>
+                          )}
+                        </td>
+                        <td className="py-6">
+                          <div className="flex items-center justify-center gap-3">
+                            <button 
+                              onClick={() => handleUpdateStock(p.id, currentStock - 1)}
+                              disabled={currentStock <= 0}
+                              className="w-10 h-10 select-none border border-brand-pink-light rounded-full flex items-center justify-center font-bold text-lg bg-white active:bg-brand-pink-light hover:bg-[#FAF7F8] transition-colors disabled:opacity-45 disabled:cursor-not-allowed"
+                            >
+                              -
+                            </button>
+                            
+                            <input 
+                              type="number" 
+                              min="0"
+                              value={currentStock}
+                              onChange={(e) => handleUpdateStock(p.id, parseInt(e.target.value) || 0)}
+                              className="w-20 text-center py-2 bg-[#FAF7F8] font-black text-sm text-brand-black rounded-lg border border-brand-pink-light focus:outline-none focus:border-brand-gold shadow-inner"
+                            />
+                            
+                            <button 
+                              onClick={() => handleUpdateStock(p.id, currentStock + 1)}
+                              className="w-10 h-10 select-none border border-brand-pink-light rounded-full flex items-center justify-center font-bold text-lg bg-white active:bg-brand-pink-light hover:bg-[#FAF7F8] transition-colors"
+                            >
+                              +
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                {products.filter(p => {
+                  const term = stockSearch.toLowerCase();
+                  return p.name.toLowerCase().includes(term) || (p.sku && p.sku.toLowerCase().includes(term));
+                }).length === 0 && (
+                  <tr>
+                    <td colSpan={6} className="py-12 text-center text-xs font-semibold text-brand-gray uppercase tracking-widest">
+                       Nenhum produto correspondente encontrado para "{stockSearch}".
+                    </td>
+                  </tr>
+                )}
               </tbody>
             </table>
           </div>
@@ -691,13 +1209,48 @@ export default function AdminDashboard() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-4 border-t border-brand-pink-medium/10">
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Imagem 1 (Principal - Quadro de Destaque)</h4>
-                    <input
-                      className="w-full bg-white border border-brand-pink-light rounded-2xl p-4 text-xs font-mono outline-none focus:border-brand-gold"
-                      value={settings.banner_img_1 || ''}
-                      onChange={(e) => setSettings({ ...settings, banner_img_1: e.target.value })}
-                      placeholder="https://..."
-                    />
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-[#4D1D54]/75">Imagem 1 (Principal - Quadro de Destaque)</h4>
+                    <div className="flex flex-col gap-2 bg-[#FAF7F8]/80 p-4 rounded-2xl border border-brand-pink-light">
+                      <input
+                        className="w-full bg-white border border-brand-pink-light rounded-xl p-3 text-xs font-mono outline-none focus:border-brand-gold"
+                        value={settings.banner_img_1 || ''}
+                        onChange={(e) => setSettings({ ...settings, banner_img_1: e.target.value })}
+                        placeholder="URL da Imagem ou faça upload abaixo..."
+                      />
+                      <div className="flex items-center gap-3">
+                        <label className="cursor-pointer bg-[#4D1D54] hover:bg-opacity-90 active:scale-95 transition-all text-white text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full text-center">
+                          📁 Carregar do Dispositivo
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => handleImageUpload(e, 'banner_img_1')} 
+                          />
+                        </label>
+                        {settings.banner_img_1 && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-green-600 font-bold">✓ Carregada</span>
+                            <button 
+                              type="button" 
+                              onClick={() => setSettings({ ...settings, banner_img_1: '' })} 
+                              className="text-[9px] font-bold text-red-500 uppercase tracking-wider hover:underline"
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {settings.banner_img_1 && (
+                        <div className="mt-2 w-24 h-24 rounded-lg overflow-hidden border border-stone-200 bg-white shadow-sm flex items-center justify-center">
+                          <img 
+                            src={settings.banner_img_1} 
+                            alt="Preview Banner 1" 
+                            className="max-w-full max-h-full object-contain" 
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      )}
+                    </div>
                     <input
                       className="w-full bg-white border border-brand-pink-light rounded-2xl p-4 text-xs font-bold outline-none focus:border-brand-gold"
                       value={settings.banner_img_1_name || ''}
@@ -712,13 +1265,48 @@ export default function AdminDashboard() {
                     />
                   </div>
                   <div className="space-y-4">
-                    <h4 className="text-[10px] font-black uppercase tracking-widest text-brand-gold">Imagem 2 (Segunda Imagem - Atrás)</h4>
-                    <input
-                      className="w-full bg-white border border-brand-pink-light rounded-2xl p-4 text-xs font-mono outline-none focus:border-brand-gold"
-                      value={settings.banner_img_2 || ''}
-                      onChange={(e) => setSettings({ ...settings, banner_img_2: e.target.value })}
-                      placeholder="https://..."
-                    />
+                    <h4 className="text-[10px] font-black uppercase tracking-widest text-[#4D1D54]/75">Imagem 2 (Segunda Imagem - Atrás)</h4>
+                    <div className="flex flex-col gap-2 bg-[#FAF7F8]/80 p-4 rounded-2xl border border-brand-pink-light">
+                      <input
+                        className="w-full bg-white border border-brand-pink-light rounded-xl p-3 text-xs font-mono outline-none focus:border-brand-gold"
+                        value={settings.banner_img_2 || ''}
+                        onChange={(e) => setSettings({ ...settings, banner_img_2: e.target.value })}
+                        placeholder="URL da Imagem ou faça upload abaixo..."
+                      />
+                      <div className="flex items-center gap-3">
+                        <label className="cursor-pointer bg-[#4D1D54] hover:bg-opacity-90 active:scale-95 transition-all text-white text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full text-center">
+                          📁 Carregar do Dispositivo
+                          <input 
+                            type="file" 
+                            accept="image/*" 
+                            className="hidden" 
+                            onChange={(e) => handleImageUpload(e, 'banner_img_2')} 
+                          />
+                        </label>
+                        {settings.banner_img_2 && (
+                          <div className="flex items-center gap-2">
+                            <span className="text-[10px] text-green-600 font-bold">✓ Carregada</span>
+                            <button 
+                              type="button" 
+                              onClick={() => setSettings({ ...settings, banner_img_2: '' })} 
+                              className="text-[9px] font-bold text-red-500 uppercase tracking-wider hover:underline"
+                            >
+                              Remover
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                      {settings.banner_img_2 && (
+                        <div className="mt-2 w-24 h-24 rounded-lg overflow-hidden border border-stone-200 bg-white shadow-sm flex items-center justify-center">
+                          <img 
+                            src={settings.banner_img_2} 
+                            alt="Preview Banner 2" 
+                            className="max-w-full max-h-full object-contain" 
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      )}
+                    </div>
                     <input
                       className="w-full bg-white border border-brand-pink-light rounded-2xl p-4 text-xs font-bold outline-none focus:border-brand-gold"
                       value={settings.banner_img_2_name || ''}
@@ -756,13 +1344,48 @@ export default function AdminDashboard() {
                   />
                 </div>
                 <div>
-                  <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-2 block">URL da Imagem da Seção</label>
-                  <input
-                    className="w-full bg-white border border-brand-pink-light rounded-2xl p-4 text-xs font-mono outline-none focus:border-brand-gold"
-                    value={settings.about_image || ''}
-                    onChange={(e) => setSettings({ ...settings, about_image: e.target.value })}
-                    placeholder="https://..."
-                  />
+                  <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-2 block">Imagem da Seção (Sobre Nós / Quem Somos)</label>
+                  <div className="flex flex-col gap-2 bg-[#FAF7F8]/80 p-4 rounded-2xl border border-brand-pink-light">
+                    <input
+                      className="w-full bg-white border border-brand-pink-light rounded-xl p-3 text-xs font-mono outline-none focus:border-brand-gold"
+                      value={settings.about_image || ''}
+                      onChange={(e) => setSettings({ ...settings, about_image: e.target.value })}
+                      placeholder="URL da Imagem ou faça upload abaixo..."
+                    />
+                    <div className="flex items-center gap-3">
+                      <label className="cursor-pointer bg-[#4D1D54] hover:bg-opacity-90 active:scale-95 transition-all text-white text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full text-center">
+                        📁 Carregar do Dispositivo
+                        <input 
+                          type="file" 
+                          accept="image/*" 
+                          className="hidden" 
+                          onChange={(e) => handleImageUpload(e, 'about_image')} 
+                        />
+                      </label>
+                      {settings.about_image && (
+                        <div className="flex items-center gap-2">
+                          <span className="text-[10px] text-green-600 font-bold">✓ Carregada</span>
+                          <button 
+                            type="button" 
+                            onClick={() => setSettings({ ...settings, about_image: '' })} 
+                            className="text-[9px] font-bold text-red-500 uppercase tracking-wider hover:underline"
+                          >
+                            Remover
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    {settings.about_image && (
+                      <div className="mt-2 w-32 h-24 rounded-lg overflow-hidden border border-stone-200 bg-white shadow-sm flex items-center justify-center">
+                        <img 
+                          src={settings.about_image} 
+                          alt="Preview Quem Somos" 
+                          className="max-w-full max-h-full object-contain" 
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
@@ -881,7 +1504,7 @@ export default function AdminDashboard() {
                 🙋 06. Dúvidas Frequentes (FAQ Sanfona)
               </h3>
               <div className="space-y-6">
-                {[0, 1, 2, 3].map((index) => {
+                {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9].map((index) => {
                   const currentFaq = (settings.faqs && settings.faqs[index]) || { q: '', a: '' };
                   const handleFaqChange = (key: 'q' | 'a', val: string) => {
                     const upFaqs = [...(settings.faqs || [])];
@@ -1165,6 +1788,116 @@ export default function AdminDashboard() {
               </div>
             </div>
 
+            {/* ACCORDION 11: CUSTOMIZAÇÃO DE SANFONAS (RODAPÉ) */}
+            <div className="border border-brand-gold/15 rounded-3xl p-6 md:p-8 space-y-8 bg-[#FAF7F8]/40 shadow-sm">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-widest text-[#8C6A3B] flex items-center gap-2 border-b border-brand-pink-medium/10 pb-4 mb-2">
+                  ⚙️ 11. Customização das Sanfonas do Rodapé (Informações, Termos & Políticas)
+                </h3>
+                <p className="text-xs text-brand-gray leading-relaxed mb-6">
+                  Personalize totalmente o conteúdo das 8 abas expansíveis localizadas no final do rodapé. 
+                  Você pode escolher entre manter o layout padrão do sistema (padrão artesanal Boho), substituir por 
+                  um texto explicativo personalizado de qualquer tamanho ou carregar uma imagem/banner completo que irá substituir 
+                  inteiramente o conteúdo daquela aba para exibição imediata e em tempo real!
+                </p>
+              </div>
+
+              {[
+                { id: 'use_gat', label: 'Use Gat' },
+                { id: 'atendimento', label: 'Atendimento' },
+                { id: 'quem_somos', label: 'Quem Somos' },
+                { id: 'como_personalizar', label: 'Como Personalizar' },
+                { id: 'duvidas_frequentes', label: 'Dúvidas Frequentes' },
+                { id: 'politicas_termos', label: 'Políticas e Prazos' },
+                { id: 'pagamento', label: 'Formas de Pagamento' },
+                { id: 'seguro', label: 'Ambiente Seguro' }
+              ].map((item) => {
+                const typeKey = `acc_${item.id}_type`;
+                const textKey = `acc_${item.id}_text`;
+                const imgKey = `acc_${item.id}_image`;
+                const currentType = settings[typeKey] || 'default';
+
+                return (
+                  <div key={item.id} className="p-5 bg-white rounded-2xl border border-brand-pink-light space-y-4 shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#FAF7F8] pb-3">
+                      <h4 className="text-xs font-black uppercase tracking-wider text-brand-black flex items-center gap-2">
+                        <span className="text-[#8C6A3B]">✦</span> Sanfona: {item.label}
+                      </h4>
+                      <select
+                        className="bg-[#FAF7F8] border border-brand-pink-light rounded-xl px-4 py-2 text-[11px] font-black uppercase tracking-wider outline-none text-[#4D1D54] focus:border-brand-gold cursor-pointer"
+                        value={currentType}
+                        onChange={(e) => setSettings({ ...settings, [typeKey]: e.target.value })}
+                      >
+                        <option value="default">Padrão do Sistema (Boho)</option>
+                        <option value="text">Texto/Frase Personalizada</option>
+                        <option value="image">Imagem/Banner Completo</option>
+                      </select>
+                    </div>
+
+                    {currentType === 'text' && (
+                      <div className="space-y-2">
+                        <label className="text-[9px] font-black uppercase tracking-widest text-brand-gold">Frase ou Texto da Seção {item.label}</label>
+                        <textarea
+                          rows={4}
+                          className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-xl p-3.5 text-xs font-medium outline-none focus:border-brand-gold leading-relaxed"
+                          value={settings[textKey] || ''}
+                          onChange={(e) => setSettings({ ...settings, [textKey]: e.target.value })}
+                          placeholder={`Escreva aqui o texto explicativo ou frases personalizadas para a aba de ${item.label}...`}
+                        />
+                      </div>
+                    )}
+
+                    {currentType === 'image' && (
+                      <div className="space-y-3">
+                        <label className="text-[9px] font-black uppercase tracking-widest text-[#4D1D54]/75 block">Imagem Completa / Banner para {item.label}</label>
+                        <div className="flex flex-col gap-2 bg-[#FAF7F8] p-4 rounded-xl border border-brand-pink-light">
+                          <input
+                            className="w-full bg-white border border-brand-pink-light rounded-lg p-2.5 text-xs font-mono outline-none focus:border-brand-gold"
+                            value={settings[imgKey] || ''}
+                            onChange={(e) => setSettings({ ...settings, [imgKey]: e.target.value })}
+                            placeholder="URL da Imagem ou envie do computador abaixo..."
+                          />
+                          <div className="flex items-center gap-3">
+                            <label className="cursor-pointer bg-[#4D1D54] hover:bg-opacity-90 active:scale-95 transition-all text-white text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full text-center">
+                              📁 Carregar Imagem
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                onChange={(e) => handleImageUpload(e, imgKey)} 
+                              />
+                            </label>
+                            {settings[imgKey] && (
+                              <div className="flex items-center gap-2">
+                                <span className="text-[10px] text-green-600 font-bold">✓ Carregada</span>
+                                <button 
+                                  type="button" 
+                                  onClick={() => setSettings({ ...settings, [imgKey]: '' })} 
+                                  className="text-[9px] font-bold text-red-500 uppercase tracking-wider hover:underline"
+                                >
+                                  Remover
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                          {settings[imgKey] && (
+                            <div className="mt-2 max-w-xs max-h-48 rounded-lg overflow-hidden border border-stone-200 bg-white shadow-xs p-1 flex items-center justify-center">
+                              <img 
+                                src={settings[imgKey]} 
+                                alt={`Preview ${item.label}`} 
+                                className="max-w-full max-h-40 object-contain rounded" 
+                                referrerPolicy="no-referrer"
+                              />
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+
             <button
               type="submit"
               className="w-full bg-brand-primary text-white py-6 rounded-full font-black uppercase tracking-widest text-[11px] shadow-xl hover:shadow-brand-primary/20 transition-all transform hover:scale-[1.02]"
@@ -1190,6 +1923,120 @@ export default function AdminDashboard() {
               >
                 Vincular Conta Bling V3
               </button>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'coupons' ? (
+        <div className="bg-white rounded-[40px] p-8 md:p-12 shadow-sm border border-brand-pink-light space-y-12">
+          <div>
+            <h2 className="text-3xl font-serif font-black text-brand-black italic">Gerenciador de Cupons</h2>
+            <p className="text-xs text-brand-gray font-medium uppercase tracking-widest mt-2">Crie e desative cupons de desconto por valor fixo ou percentual aplicado em tempo real no site</p>
+            <div className="w-24 h-1 bg-[#B48A4E] mt-4 rounded-full"></div>
+          </div>
+
+          <form onSubmit={handleAddCoupon} className="bg-[#FAF7F8]/40 border border-brand-pink-medium/20 rounded-3xl p-6 md:p-8 space-y-6">
+            <h3 className="text-sm font-black uppercase tracking-widest text-[#4D1D54] flex items-center gap-2 border-b border-brand-pink-medium/10 pb-4">
+              🎟️ Criar Novo Cupom
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-2 block">Código do Cupom</label>
+                <input
+                  required
+                  type="text"
+                  placeholder="EX: COMPRA10"
+                  value={newCouponCode}
+                  onChange={(e) => setNewCouponCode(e.target.value.toUpperCase())}
+                  className="w-full bg-white border border-brand-pink-light rounded-2xl p-4 text-xs font-bold outline-none focus:border-brand-gold transition-all"
+                />
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-2 block">Tipo de Desconto</label>
+                <select
+                  value={newCouponType}
+                  onChange={(e) => setNewCouponType(e.target.value as any)}
+                  className="w-full bg-white border border-brand-pink-light rounded-2xl p-4 text-xs font-bold outline-none focus:border-brand-gold transition-all appearance-none"
+                >
+                  <option value="percentage">Porcentagem (%)</option>
+                  <option value="value">Valor Fixo (R$)</option>
+                </select>
+              </div>
+              <div>
+                <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-2 block">Valor do Desconto</label>
+                <input
+                  required
+                  type="number"
+                  step="0.01"
+                  min="0.1"
+                  placeholder="0.00"
+                  value={newCouponValue || ''}
+                  onChange={(e) => setNewCouponValue(Number(e.target.value))}
+                  className="w-full bg-white border border-brand-pink-light rounded-2xl p-4 text-xs font-bold outline-none focus:border-brand-gold transition-all"
+                />
+              </div>
+            </div>
+            <button
+              type="submit"
+              className="w-full bg-[#4D1D54] text-white py-4 rounded-full font-black uppercase tracking-widest text-[9px] shadow-md hover:bg-[#6c2877] transition-all"
+            >
+              Criar Cupom de Desconto
+            </button>
+          </form>
+
+          <div className="bg-white rounded-[40px] p-2 shadow-sm border border-brand-pink-light">
+            <h3 className="text-sm font-black uppercase tracking-widest text-brand-black italic p-6">Cupons Ativos & Histórico</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left">
+                <thead>
+                  <tr className="border-b border-brand-pink-light pb-4">
+                    <th className="pb-4 pl-6 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Código</th>
+                    <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Tipo</th>
+                    <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Desconto</th>
+                    <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Status</th>
+                    <th className="pb-4 pr-6 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium text-right">Ações</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-brand-pink-light/30">
+                  {coupons.map((coupon) => (
+                    <tr key={coupon.id} className="group hover:bg-[#FAF7F8] transition-colors">
+                      <td className="py-6 pl-6 font-bold text-sm text-brand-primary tracking-wider uppercase">{coupon.code}</td>
+                      <td className="py-6 text-xs text-brand-gray font-medium uppercase">
+                        {coupon.type === 'percentage' ? 'Porcentagem' : 'Valor Fixo'}
+                      </td>
+                      <td className="py-6 text-xs font-black text-brand-black">
+                        {coupon.type === 'percentage' ? `${coupon.value}%` : formatPrice(coupon.value)}
+                      </td>
+                      <td className="py-6">
+                        <button
+                          onClick={() => handleToggleCouponActive(coupon.id, coupon.active)}
+                          className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${
+                            coupon.active 
+                              ? 'bg-green-100 text-green-800 hover:bg-green-200' 
+                              : 'bg-red-100 text-red-800 hover:bg-red-200'
+                          }`}
+                        >
+                          {coupon.active ? 'Ativo' : 'Inativo'}
+                        </button>
+                      </td>
+                      <td className="py-6 pr-6 text-right">
+                        <button
+                          onClick={() => handleDeleteCoupon(coupon.id)}
+                          className="text-red-500 hover:text-red-700 p-2 transition-colors inline-flex items-center"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {coupons.length === 0 && (
+                    <tr>
+                      <td colSpan={5} className="py-8 text-center text-xs font-bold text-brand-gray uppercase tracking-widest">
+                        Nenhum cupom cadastrado ainda.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           </div>
         </div>
@@ -1415,13 +2262,48 @@ export default function AdminDashboard() {
                 )}
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">URL da Imagem</label>
-                <input 
-                  required
-                  className="w-full bg-brand-gray rounded-2xl p-4 font-bold outline-none"
-                  value={newProduct.imageUrl}
-                  onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})}
-                />
+                <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">Imagem do Produto</label>
+                <div className="flex flex-col gap-3 bg-brand-gray/30 p-4 rounded-3xl border border-brand-pink-light/30">
+                  <input 
+                    required
+                    className="w-full bg-white rounded-2xl p-4 font-bold outline-none border border-brand-pink-light/20 text-xs shadow-sm"
+                    placeholder="URL da Imagem ou faça upload abaixo..."
+                    value={newProduct.imageUrl}
+                    onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})}
+                  />
+                  <div className="flex flex-wrap items-center gap-3">
+                    <label className="cursor-pointer bg-[#4D1D54] hover:bg-opacity-90 active:scale-95 transition-all text-white text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full text-center">
+                      📁 Escolher Imagem do Dispositivo
+                      <input 
+                        type="file" 
+                        accept="image/*" 
+                        className="hidden" 
+                        onChange={handleProductImageUpload} 
+                      />
+                    </label>
+                    {uploadingProductImage && (
+                      <span className="text-[10px] text-brand-gold animate-pulse font-bold">Enviando para o servidor...</span>
+                    )}
+                    {newProduct.imageUrl && !uploadingProductImage && (
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] text-green-600 font-bold">✓ Imagem Selecionada</span>
+                        {newProduct.imageUrl.startsWith('/uploads/') && (
+                          <span className="text-[8px] opacity-60 font-mono text-stone-500 bg-stone-100 px-1 py-0.5 rounded">Pasta Uploads</span>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  {newProduct.imageUrl && (
+                    <div className="mt-2 w-24 h-24 rounded-2xl overflow-hidden border border-brand-pink-medium/20 bg-white shadow-sm flex items-center justify-center">
+                      <img 
+                        src={newProduct.imageUrl} 
+                        alt="Preview Produto" 
+                        className="max-w-full max-h-full object-contain" 
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
               <div className="flex gap-4 pt-6">
                 <button type="button" onClick={() => { setShowAddModal(false); setEditingProduct(null); }} className="flex-1 bg-brand-gray py-4 rounded-full font-black uppercase tracking-widest">Cancelar</button>

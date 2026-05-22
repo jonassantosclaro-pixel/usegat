@@ -128,7 +128,7 @@ export default function Category() {
               <div>
                 <div className="relative aspect-square rounded-[2rem] bg-white overflow-hidden border border-brand-gold/5 flex items-center justify-center p-4">
                   <img 
-                    src={product.imageUrl} 
+                    src={product.imageUrl || "/imagens/mugs-boho.jpg"} 
                     alt={product.name}
                     className="w-full h-full object-contain group-hover:scale-105 transition-transform duration-500 animate-in fade-in"
                   />
@@ -153,24 +153,49 @@ export default function Category() {
                   )}
                 </div>
 
-                <div className="mt-6">
-                  <div className="flex justify-between items-start gap-4">
-                    <div>
-                      <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold block mb-1">
-                        {product.subcategory || getCategoryTitle()}
-                      </span>
-                      <h3 className="font-serif italic font-bold text-xl text-brand-black group-hover:text-brand-primary transition-colors">
-                        {product.name}
-                      </h3>
-                    </div>
-                    <div className="text-right shrink-0">
-                      <span className="text-brand-primary font-black text-2xl block">{formatPrice(product.price)}</span>
-                      <span className="text-[9px] font-bold text-gray-400 block uppercase tracking-wider">ou 3x s/ juros</span>
-                    </div>
-                  </div>
+                 <div className="mt-6">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-brand-gold block mb-1">
+                    {product.subcategory || getCategoryTitle()}
+                  </span>
+                  <h3 className="font-serif italic font-bold text-xl text-brand-black group-hover:text-brand-primary transition-colors">
+                    {product.name}
+                  </h3>
                   <p className="text-xs text-brand-gray font-medium mt-4 line-clamp-3 leading-relaxed">
                     {product.description}
                   </p>
+                </div>
+
+                {/* Rating and Price Logic matches User Image */}
+                <div className="mt-6 pt-5 border-t border-[#FAF7F8]/80 flex flex-col items-center text-center">
+                  {/* 5-Star Rating with Count (1) */}
+                  <div className="flex items-center gap-1.5 mb-2.5">
+                    <div className="flex">
+                      <Star className="w-4 h-4 fill-brand-gold text-brand-gold" />
+                      <Star className="w-4 h-4 fill-brand-gold text-brand-gold" />
+                      <Star className="w-4 h-4 fill-brand-gold text-brand-gold" />
+                      <Star className="w-4 h-4 fill-brand-gold text-brand-gold" />
+                      <Star className="w-4 h-4 fill-brand-gold text-brand-gold" />
+                    </div>
+                    <span className="text-[11px] font-black text-brand-gold/80 font-mono">(1)</span>
+                  </div>
+
+                  {/* Pix Price Row with 10% off */}
+                  <div className="flex items-baseline justify-center gap-1 bg-[#FAF7F8]/80 px-4 py-1.5 rounded-full border border-brand-pink-medium/10">
+                    <span className="font-serif font-black text-2xl text-[#8C6A3B]">
+                      {formatPrice(product.price * 0.9)}
+                    </span>
+                    <span className="text-xs font-bold text-stone-500 lowercase">no pix</span>
+                  </div>
+
+                  {/* Promo Text */}
+                  <span className="text-[10px] font-black uppercase tracking-widest text-green-600 mt-1">
+                    com 10% de desconto
+                  </span>
+
+                  {/* Card Installments Row */}
+                  <div className="text-[11px] text-stone-600 mt-2 font-medium tracking-tight">
+                    até <span className="font-black text-stone-900">3x</span> de <span className="font-black text-stone-900">{formatPrice(product.price / 3)}</span> sem juros
+                  </div>
                 </div>
               </div>
 

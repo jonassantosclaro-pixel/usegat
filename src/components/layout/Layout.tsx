@@ -7,6 +7,7 @@ import { NewsletterPopup } from '../ui/NewsletterPopup';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'motion/react';
 
 export default function Layout({ children }: { children: React.ReactNode }) {
   const [settings, setSettings] = useState<any>(null);
@@ -16,7 +17,8 @@ export default function Layout({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'settings'), (q) => {
       if (!q.empty) {
-        setSettings(q.docs[0].data());
+        const globalDoc = q.docs.find(d => d.id === 'global') || q.docs[0];
+        setSettings(globalDoc.data());
       }
     });
     return () => unsubscribe();
@@ -81,13 +83,28 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       
       {!isAdminPage && <Header />}
       {!isAdminPage && <CartSidebar />}
+      
       <main className="flex-grow relative z-10 w-full">
-        {children}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={location.pathname}
+            initial={{ opacity: 0, y: 12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full h-full flex flex-col flex-grow"
+          >
+            {children}
+          </motion.div>
+        </AnimatePresence>
       </main>
+      
       {!isAdminPage && <Footer />}
       {!isAdminPage && <NewsletterPopup />}
       
       {!isAdminPage && <ChatAI />}
+
+
     </div>
   );
 }

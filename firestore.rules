@@ -40,7 +40,7 @@ service cloud.firestore {
           && data.name is string && data.name.size() > 0 && data.name.size() <= 200
           && data.price is number && data.price >= 0
           && data.category is string && data.category.size() > 0
-          && data.imageUrl is string && data.imageUrl.size() <= 1000
+          && data.imageUrl is string && data.imageUrl.size() <= 2000000
           && (data.get('stock', 0) is number)
           && (data.get('customizable', false) is bool)
           && (data.get('hasNameAndSurname', false) is bool)
@@ -95,6 +95,12 @@ service cloud.firestore {
           && data.total is number && data.total >= 0
           && data.status in ['PENDENTE', 'PRODUÇÃO', 'ENVIADO', 'CONCLUÍDO', 'CANCELADO']
           && (data.get('createdAt', '') is string);
+    }
+
+    // 5. COUPONS
+    match /coupons/{couponId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

@@ -15,7 +15,8 @@ export default function Footer() {
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'settings'), (q) => {
       if (!q.empty) {
-        setSettings(q.docs[0].data());
+        const globalDoc = q.docs.find(d => d.id === 'global') || q.docs[0];
+        setSettings(globalDoc.data());
       }
     });
     return () => unsubscribe();
@@ -29,16 +30,58 @@ export default function Footer() {
     setOpenSection(openSection === id ? null : id);
   };
 
+  const renderSectionContent = (id: string, fallbackContent: React.ReactNode) => {
+    const keyId = id.replace(/-/g, '_');
+    const type = settings?.[`acc_${keyId}_type`] || 'default';
+    const text = settings?.[`acc_${keyId}_text` || ''];
+    const imageUrl = settings?.[`acc_${keyId}_image` || ''];
+
+    if (type === 'text') {
+      return (
+        <div className="py-6">
+          <div className="bg-[#FAF7F8] p-6 sm:p-10 rounded-[2.5rem] border border-stone-150">
+            <p className="text-xs sm:text-sm text-brand-gray font-medium leading-relaxed max-w-2xl mx-auto whitespace-pre-wrap text-center sm:text-left">
+              {text || "Nenhum texto cadastrado ainda nas Configurações da aba."}
+            </p>
+          </div>
+        </div>
+      );
+    }
+
+    if (type === 'image') {
+      return (
+        <div className="py-6 flex justify-center">
+          <div className="bg-[#FAF7F8] p-4 sm:p-6 rounded-[2.5rem] border border-stone-150 w-full flex justify-center">
+            {imageUrl ? (
+              <img 
+                src={imageUrl} 
+                alt="Banner Personalizado" 
+                className="w-full h-auto max-h-[850px] object-contain rounded-2xl shadow-sm hover:scale-[1.01] transition-transform duration-500"
+                referrerPolicy="no-referrer"
+              />
+            ) : (
+              <div className="p-8 text-center text-xs text-brand-gray uppercase tracking-widest font-black">
+                Nenhuma imagem carregada ainda nas Configurações da aba.
+              </div>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    return fallbackContent;
+  };
+
   const sections = [
     {
       id: 'use-gat',
       title: 'Use Gat',
-      content: (
+      content: renderSectionContent('use_gat', (
         <div className="py-6">
           <div className="bg-[#FAF7F8] p-6 sm:p-10 rounded-[2.5rem] border border-stone-150">
             <div className="flex flex-col items-center text-center space-y-6">
               <img 
-                src="https://i.postimg.cc/rFHZmkSN/1.png" 
+                src="/imagens/logo-gat-purple.png" 
                 alt="USE GAT Logo" 
                 className="h-16 w-auto object-contain"
               />
@@ -53,12 +96,12 @@ export default function Footer() {
             </div>
           </div>
         </div>
-      )
+      ))
     },
     {
       id: 'atendimento',
       title: 'Atendimento',
-      content: (
+      content: renderSectionContent('atendimento', (
         <div className="py-6">
           <div className="bg-[#FAF7F8] p-6 sm:p-10 rounded-[2.5rem] border border-stone-150 space-y-8">
             <h3 className="text-lg font-serif font-bold text-center text-brand-black border-b border-stone-200 pb-3">Fale com o Ateliê</h3>
@@ -87,51 +130,82 @@ export default function Footer() {
             </div>
           </div>
         </div>
-      )
+      ))
     },
     {
       id: 'quem-somos',
       title: 'Quem somos',
-      content: (
+      content: renderSectionContent('quem_somos', (
         <div className="py-6 space-y-8">
           <div className="bg-[#FAF7F8] p-6 sm:p-10 rounded-[2.5rem] border border-stone-150">
             {/* 1. Main Narrative text - Pristine styling */}
             <div className="space-y-6 max-w-2xl mx-auto text-center md:text-justify text-brand-gray font-medium text-sm sm:text-base leading-relaxed">
               <span className="text-[10px] font-black uppercase tracking-[0.2em] text-brand-gold block text-center">Nossa Trajetória Boho</span>
-              <h3 className="text-3xl font-serif text-brand-black text-center mb-4">Começamos em uma lavanderia de 2m²</h3>
+              <h3 className="text-3xl font-serif text-brand-black text-center mb-4">
+                {settings?.about_title || "Começamos em uma lavanderia de 2m²"}
+              </h3>
               
-              <p>
-                A USE GAT nasceu em 2023, fruto de muito trabalho, perseverança e um propósito claro de criar mimos que tocam o coração de quem recebe. Começamos de forma simples, organizando materiais e criando peças exclusivas dentro de um pequeno espaço residencial.
-              </p>
-              <p>
-                Em seguida, passamos a ilustrar momentos inesquecíveis da vida de nossos clientes: revelações de batismo, anúncios de gravidez e presentes de casamento afetivos sob medida.
-              </p>
-              <p className="font-bold text-[#4A1E59] text-center italic py-2">
-                "De um pequeno compartimento residencial, nasceram histórias infinitas e canecas que levam amor por todo o território nacional."
-              </p>
+              {settings?.about_text ? (
+                <div className="whitespace-pre-wrap text-sm sm:text-base leading-relaxed font-medium text-brand-gray text-center md:text-justify">
+                  {settings.about_text}
+                </div>
+              ) : (
+                <>
+                  <p>
+                    A USE GAT nasceu em 2023, fruto de muito trabalho, perseverança e um propósito claro de criar mimos que tocam o coração de quem recebe. Começamos de forma simples, organizando materiais e criando peças exclusivas dentro de um pequeno espaço residencial.
+                  </p>
+                  <p>
+                    Em seguida, passamos a ilustrar momentos inesquecíveis da vida de nossos clientes: revelações de batismo, anúncios de gravidez e presentes de casamento afetivos sob medida.
+                  </p>
+                  <p className="font-bold text-[#4A1E59] text-center italic py-2">
+                    "De um pequeno compartimento residencial, nasceram histórias infinitas e canecas que levam amor por todo o território nacional."
+                  </p>
+                </>
+              )}
             </div>
 
             {/* 2. Photo gallery grid - 3 requested URLs - Clean captions - Complete visibility */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mt-12">
               <div className="bg-white p-3 rounded-2xl border border-stone-200/60 shadow-sm flex flex-col justify-between">
-                <div className="aspect-[4/5] bg-stone-100 rounded-xl overflow-hidden mb-3">
-                  <img src="https://i.postimg.cc/JhPqDjhB/Whats-App-Image-2026-05-15-at-16-03-49-(1).jpg" alt="Oficina Inicial" className="w-full h-full object-cover" />
+                <div className={`bg-stone-100 rounded-xl overflow-hidden mb-3 ${settings?.about_image ? 'h-auto max-h-[300px] flex items-center justify-center p-1' : 'aspect-[4/5]'}`}>
+                  <img 
+                    src={settings?.about_image || "/imagens/oficina-inicial.jpg"} 
+                    alt={settings?.about_title || "Ateliê GAT"} 
+                    referrerPolicy="no-referrer" 
+                    className={`${settings?.about_image ? 'w-full h-auto max-h-[290px] object-contain rounded-lg' : 'w-full h-full object-cover'}`} 
+                  />
                 </div>
-                <div className="text-center font-serif text-xs italic text-brand-black">Nossa Oficina Inicial</div>
+                <div className="text-center font-serif text-xs italic text-brand-black">
+                  {settings?.about_title && settings?.about_image ? "Nossa Linda História" : "Nossa Oficina Inicial"}
+                </div>
               </div>
 
               <div className="bg-white p-3 rounded-2xl border border-stone-200/60 shadow-sm flex flex-col justify-between">
-                <div className="aspect-[4/5] bg-stone-100 rounded-xl overflow-hidden mb-3">
-                  <img src="https://i.postimg.cc/bv3TD1vJ/Whats-App-Image-2026-05-15-at-16-10-17-(1).jpg" alt="Canecas Minimalistas" className="w-full h-full object-cover" />
+                <div className={`bg-stone-100 rounded-xl overflow-hidden mb-3 ${settings?.banner_img_2 ? 'h-auto max-h-[300px] flex items-center justify-center p-1' : 'aspect-[4/5]'}`}>
+                  <img 
+                    src={settings?.banner_img_2 || "/imagens/mugs-boho.jpg"} 
+                    alt={settings?.banner_img_2_name || "Mugs Boho Minimalista"} 
+                    referrerPolicy="no-referrer" 
+                    className={`${settings?.banner_img_2 ? 'w-full h-auto max-h-[290px] object-contain rounded-lg' : 'w-full h-full object-cover'}`} 
+                  />
                 </div>
-                <div className="text-center font-serif text-xs italic text-brand-black">Mugs Boho Minimalista</div>
+                <div className="text-center font-serif text-xs italic text-brand-black">
+                  {settings?.banner_img_2_name || "Mugs Boho Minimalista"}
+                </div>
               </div>
 
               <div className="bg-white p-3 rounded-2xl border border-stone-200/60 shadow-sm flex flex-col justify-between">
-                <div className="aspect-[4/5] bg-stone-100 rounded-xl overflow-hidden mb-3">
-                  <img src="https://i.postimg.cc/hv2SWwmj/704945826-1785809935732333-1325427837227963059-n.jpg" alt="Thermal Bottle Sua Historia" className="w-full h-full object-cover" />
+                <div className={`bg-stone-100 rounded-xl overflow-hidden mb-3 ${settings?.banner_img_1 ? 'h-auto max-h-[300px] flex items-center justify-center p-1' : 'aspect-[4/5]'}`}>
+                  <img 
+                    src={settings?.banner_img_1 || "/imagens/banner-sua-historia.jpg"} 
+                    alt={settings?.banner_img_1_name || "Garrafa 'Sua História'"} 
+                    referrerPolicy="no-referrer" 
+                    className={`${settings?.banner_img_1 ? 'w-full h-auto max-h-[290px] object-contain rounded-lg' : 'w-full h-full object-cover'}`} 
+                  />
                 </div>
-                <div className="text-center font-serif text-xs italic text-brand-black">Garrafa 'Sua História'</div>
+                <div className="text-center font-serif text-xs italic text-brand-black">
+                  {settings?.banner_img_1_name || "Garrafa 'Sua História'"}
+                </div>
               </div>
             </div>
 
@@ -144,12 +218,12 @@ export default function Footer() {
             </div>
           </div>
         </div>
-      )
+      ))
     },
     {
       id: 'como-personalizar',
       title: 'Como personalizar seu pedido',
-      content: (
+      content: renderSectionContent('como_personalizar', (
         <div className="py-6">
           <div className="bg-[#FAF7F8] p-6 sm:p-10 rounded-[2.5rem] border border-stone-150 space-y-6 text-brand-gray text-sm">
             <h4 className="text-lg font-serif text-brand-black font-bold">Instruções Importantes</h4>
@@ -161,12 +235,12 @@ export default function Footer() {
             </p>
           </div>
         </div>
-      )
+      ))
     },
     {
       id: 'duvidas-frequentes',
       title: 'Dúvidas Frequentes',
-      content: (
+      content: renderSectionContent('duvidas_frequentes', (
         <div className="py-6">
           <div className="bg-[#FAF7F8] p-6 sm:p-10 rounded-[2.5rem] border border-stone-150 space-y-4">
             {[
@@ -181,12 +255,12 @@ export default function Footer() {
             ))}
           </div>
         </div>
-      )
+      ))
     },
     {
       id: 'politicas-termos',
       title: 'Políticas e Prazos',
-      content: (
+      content: renderSectionContent('politicas_termos', (
         <div className="py-6">
           <div className="bg-[#FAF7F8] p-6 sm:p-10 rounded-[2.5rem] border border-stone-150 text-brand-gray text-xs sm:text-sm space-y-6">
             <h4 className="text-base font-serif font-bold text-brand-black">Políticas de Devolução & Arrependimento</h4>
@@ -198,29 +272,29 @@ export default function Footer() {
             </p>
           </div>
         </div>
-      )
+      ))
     },
     {
       id: 'pagamento',
       title: 'Formas de pagamento',
-      content: (
+      content: renderSectionContent('pagamento', (
         <div className="py-4">
           <div className="flex flex-wrap gap-4 opacity-75 justify-center sm:justify-start items-center">
-            <img src="https://upload.wikimedia.org/wikipedia/commons/5/5e/Visa_Inc._logo.svg" alt="Visa" className="h-4" />
-            <img src="https://upload.wikimedia.org/wikipedia/commons/2/2a/Mastercard-logo.svg" alt="Mastercard" className="h-4" />
+            <img src="/imagens/payment-visa.svg" alt="Visa" className="h-4" />
+            <img src="/imagens/payment-mastercard.svg" alt="Mastercard" className="h-4" />
             <div className="bg-brand-primary/10 text-brand-primary px-3 py-1 rounded text-xs font-black">PIX (-5% off)</div>
           </div>
           <p className="text-[10px] text-gray-400 mt-3 font-semibold uppercase tracking-wider text-center sm:text-left">Criptografia nativa em ambiente 100% seguro (SSL)</p>
         </div>
-      )
+      ))
     },
     {
       id: 'seguro',
       title: 'Ambiente seguro',
-      content: (
+      content: renderSectionContent('seguro', (
         <div className="py-4 flex flex-col sm:flex-row items-center gap-6">
           <img 
-            src="https://i.postimg.cc/nL7MTF1R/Whats-App-Image-2026-05-15-at-11-16-02.jpg" 
+            src="/imagens/footer-whats.jpg" 
             alt="Ambiente Seguro" 
             className="h-10 w-auto rounded object-contain shadow-sm"
           />
@@ -228,7 +302,7 @@ export default function Footer() {
             🔐 Seus dados estão criptografados na USE GAT.
           </div>
         </div>
-      )
+      ))
     }
   ];
 
@@ -270,7 +344,7 @@ export default function Footer() {
           <div className="flex flex-col items-center text-center space-y-6">
             <Link to="/">
               <img 
-                src="https://i.postimg.cc/rFHZmkSN/1.png" 
+                src="/imagens/logo-gat-purple.png" 
                 alt="USE.GAT Logo" 
                 className="h-16 w-auto object-contain"
               />

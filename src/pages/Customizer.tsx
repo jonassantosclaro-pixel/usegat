@@ -478,7 +478,7 @@ export default function Customizer() {
         </div>
 
         {/* Canvas Area */}
-        <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-[60px] shadow-inner border border-brand-pink-light p-12 overflow-hidden relative min-h-[600px]">
+        <div className="flex-1 flex flex-col items-center justify-center bg-white rounded-[40px] sm:rounded-[60px] shadow-inner border border-brand-pink-light p-4 sm:p-12 overflow-hidden relative min-h-[480px] sm:min-h-[600px]">
           <div className="mb-6 flex gap-4">
             <div className="flex items-center gap-2 px-4 py-2 bg-brand-pink-light rounded-full text-[8px] font-black uppercase tracking-widest text-brand-primary">
                <span className="w-2 h-2 bg-green-500 rounded-full"></span>
@@ -486,7 +486,7 @@ export default function Customizer() {
             </div>
           </div>
 
-          <div className="relative">
+          <div className="relative origin-center scale-[0.72] xs:scale-[0.85] sm:scale-100 my-[-70px] sm:my-0 transition-all duration-300">
             {/* The base product image - Pure canvas look */}
             <div className={`relative ${product?.category === 'capas' ? 'w-[320px] h-[600px] rounded-[50px] overflow-hidden border-[12px] border-brand-black shadow-2xl' : 'w-[380px] h-[550px] bg-brand-pink-light/30 rounded-[40px] flex items-center justify-center p-12 ring-1 ring-brand-pink-light'}`}>
               <img 

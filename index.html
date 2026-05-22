@@ -4,6 +4,37 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Google AI Studio App</title>
+    
+    <!-- Preload custom fonts to ensure they load instantly and appear on the bottle design preview -->
+    <link rel="preload" href="/fonts/HelloValentica.ttf" as="font" type="font/ttf" crossorigin="anonymous" />
+    <link rel="preload" href="/fonts/CreamCake.otf" as="font" type="font/otf" crossorigin="anonymous" />
+    <link rel="preload" href="/fonts/BillionMiracles.ttf" as="font" type="font/ttf" crossorigin="anonymous" />
+    
+    <style>
+      @font-face {
+        font-family: 'Hello Valentica';
+        src: url('/fonts/HelloValentica.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: 'Cream Cake';
+        src: url('/fonts/CreamCake.otf') format('opentype');
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+      }
+
+      @font-face {
+        font-family: 'Billion Miracles';
+        src: url('/fonts/BillionMiracles.ttf') format('truetype');
+        font-weight: normal;
+        font-style: normal;
+        font-display: swap;
+      }
+    </style>
   </head>
   <body>
     <div id="root"></div>

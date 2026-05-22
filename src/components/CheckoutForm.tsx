@@ -5,6 +5,7 @@ import { useAuth } from '@/src/lib/AuthContext';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import axios from 'axios';
+import { motion, AnimatePresence } from 'motion/react';
 
 interface CheckoutFormProps {
   onProcess: (data: any) => Promise<any>;
@@ -17,6 +18,9 @@ export default function CheckoutForm({ onProcess, totalProducts, onShippingUpdat
   const [step, setStep] = useState<'info' | 'payment'>('info');
   const [method, setMethod] = useState<'pix' | 'card'>('pix');
   const [success, setSuccess] = useState(false);
+  
+  const [showTermsModal, setShowTermsModal] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [calculatingShipping, setCalculatingShipping] = useState(false);
   const [pixData, setPixData] = useState<any>(null);
@@ -121,8 +125,14 @@ export default function CheckoutForm({ onProcess, totalProducts, onShippingUpdat
     }
   };
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    setTermsAccepted(false);
+    setShowTermsModal(true);
+  };
+
+  const handleFinalProcess = async () => {
+    setShowTermsModal(false);
     setLoading(true);
     try {
       const response = await onProcess({ 
@@ -210,7 +220,8 @@ export default function CheckoutForm({ onProcess, totalProducts, onShippingUpdat
   }
 
   return (
-    <form onSubmit={handleSubmit} className="bg-white p-8 rounded-[40px] text-brand-black shadow-2xl space-y-6">
+    <>
+      <form onSubmit={handleSubmit} className="bg-white p-8 rounded-[40px] text-brand-black shadow-2xl space-y-6">
       <div className="flex gap-2 p-1 bg-brand-gray rounded-full mb-8">
         <button 
           type="button"
@@ -343,5 +354,94 @@ export default function CheckoutForm({ onProcess, totalProducts, onShippingUpdat
         }
       </button>
     </form>
-  );
+
+    {/* Pre-checkout Confirmation terms modal */}
+    <AnimatePresence>
+      {showTermsModal && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => { setShowTermsModal(false); setTermsAccepted(false); }}
+            className="absolute inset-0 bg-brand-black/60 backdrop-blur-md"
+          />
+          
+          {/* Modal Box */}
+          <motion.div 
+            initial={{ scale: 0.95, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 20 }}
+            transition={{ type: "spring", duration: 0.4 }}
+            className="relative bg-white w-full max-w-xl rounded-[2.5rem] shadow-2xl p-8 md:p-10 border border-brand-pink-medium/10 overflow-hidden flex flex-col space-y-6 max-h-[90vh]"
+          >
+            <h4 className="text-xl md:text-2xl font-serif font-black text-brand-black italic border-b border-stone-100 pb-4 flex items-center gap-2">
+              📋 Confirmação de Personalização
+            </h4>
+
+            <div className="text-xs uppercase tracking-widest text-[#8C6A3B] font-black">
+              Por favor, revise seu pedido antes de prosseguir
+            </div>
+
+            {/* Scrollable verbatim texts */}
+            <div className="flex-1 overflow-y-auto bg-[#FAF7F8] p-6 rounded-3xl border border-brand-pink-medium/10 text-stone-700 text-xs leading-relaxed space-y-4 font-medium select-none custom-scrollbar">
+              <p className="font-extrabold text-[#4D1D54] text-sm leading-normal">
+                Antes de finalizarmos seu pedido, confira atentamente as informações abaixo:
+              </p>
+              <div className="space-y-2 border-t border-dashed border-brand-pink-medium/25 pt-4">
+                <p className="font-bold text-[#8C6A3B] flex items-center gap-1">
+                  📝 Conferência das informações para personalização:
+                </p>
+                <p className="text-[11px] leading-relaxed text-stone-600">
+                  É de responsabilidade do cliente verificar corretamente todas as informações enviadas para personalização, incluindo:
+                </p>
+                <ul className="list-disc pl-5 space-y-1 text-[11px] text-stone-600">
+                  <li>Ortografia e escrita dos textos (isso inclui acentos, vírgulas, hífens).</li>
+                  <li>Qualidade e resolução das imagens enviadas para caricaturas.</li>
+                  <li>A disposição e o alinhamento das artes customizadas.</li>
+                </ul>
+                <p className="text-[11px] leading-relaxed text-stone-600 font-bold italic border-t border-stone-100 pt-3">
+                  Estou ciente de que, por se tratar de um produto personalizado sob demanda, não serão efetuadas trocas ou devoluções em decorrência de erros de digitação cometidos no ato da compra.
+                </p>
+              </div>
+            </div>
+
+            {/* Checkbox agreement */}
+            <label className="flex items-start gap-3 bg-[#FAF7F8] border border-[#B48A4E]/20 p-4 rounded-2xl cursor-pointer hover:bg-white/40 transition-colors">
+              <input 
+                type="checkbox" 
+                checked={termsAccepted}
+                onChange={(e) => setTermsAccepted(e.target.checked)}
+                className="w-5 h-5 accent-[#4D1D54] shrink-0 mt-0.5 cursor-pointer"
+              />
+              <span className="text-xs font-black text-[#4D1D54] tracking-tight uppercase select-none">
+                ✅ Li e concordo com os termos de personalização
+              </span>
+            </label>
+
+            {/* Confirmation terms button actions */}
+            <div className="flex gap-4 pt-2">
+              <button
+                type="button"
+                onClick={() => { setShowTermsModal(false); setTermsAccepted(false); }}
+                className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-600 py-4 rounded-full font-black uppercase tracking-widest text-[10px] transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                disabled={!termsAccepted}
+                onClick={handleFinalProcess}
+                className="flex-1 bg-[#4D1D54] disabled:opacity-50 hover:bg-[#6c2877] text-white py-4 rounded-full font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all shadow-md"
+              >
+                Confirmar e Finalizar
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
+  </>
+);
 }

@@ -1,5 +1,5 @@
 import { ShoppingCart, User as UserIcon, Search, Menu, X, Instagram, Heart } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/src/lib/AuthContext';
 import { useCart } from '@/src/lib/CartContext';
@@ -8,9 +8,18 @@ import { motion, AnimatePresence } from 'motion/react';
 
 export default function Header() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [isScrolled, setIsScrolled] = useState(false);
   const { user, isAdmin, signOut } = useAuth();
   const { items, setIsSidebarOpen } = useCart();
   const cartCount = items.reduce((acc, item) => acc + item.quantity, 0);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setIsScrolled(window.scrollY > 20);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
 
   const categories: { name: string; path: string; highlight?: boolean }[] = [
     { name: 'Garrafas Térmicas', path: '/categoria/garrafas-termicas' },
@@ -19,21 +28,40 @@ export default function Header() {
   ];
 
   return (
-    <header className="bg-white sticky top-0 z-50 border-b border-brand-pink-light">
+    <header className={cn(
+      "sticky top-0 z-50 transition-all duration-500",
+      isScrolled 
+        ? "bg-white/85 backdrop-blur-xl shadow-[0_4px_30px_rgba(0,0,0,0.03)] border-b border-white/40" 
+        : "bg-white border-b border-brand-pink-light"
+    )}>
       {/* Top Bar - Urgent or promo info */}
-      <div className="bg-brand-primary text-white text-[10px] py-2 text-center font-bold uppercase tracking-[0.2em] px-4">
-        <span>💘 Use o cupom <span className="font-black text-white px-2 py-0.5 bg-white/20 rounded-md">GATLOVE</span> e ganhe 10% OFF</span> 
-      </div>
+      <AnimatePresence>
+        {!isScrolled && (
+          <motion.div 
+            initial={{ height: 'auto', opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            className="bg-brand-primary text-white text-[10px] py-2 text-center font-bold uppercase tracking-[0.2em] px-4 overflow-hidden relative z-50"
+          >
+            <span>💘 Use o cupom <span className="font-black text-white px-2 py-0.5 bg-white/20 rounded-md">GATLOVE</span> e ganhe 10% OFF</span> 
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Main Header */}
       <div className="max-w-7xl mx-auto px-6 lg:px-10">
-        <div className="flex justify-between items-center h-16 sm:h-24">
+        <div className={cn(
+          "flex justify-between items-center transition-all duration-500",
+          isScrolled ? "h-14 sm:h-16" : "h-16 sm:h-24"
+        )}>
           {/* Logo */}
           <Link to="/" className="flex items-center group relative z-10">
             <img 
-              src="https://i.postimg.cc/63RvxFdQ/1.png" 
+              src="/imagens/logo-gat-purple.png" 
               alt="USE.GAT Logo" 
-              className="h-10 sm:h-20 w-auto object-contain"
+              className={cn(
+                "w-auto object-contain transition-all duration-500",
+                isScrolled ? "h-8 sm:h-14" : "h-10 sm:h-20"
+              )}
             />
           </Link>
 

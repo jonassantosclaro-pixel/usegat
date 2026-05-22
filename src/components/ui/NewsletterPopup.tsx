@@ -74,7 +74,7 @@ export function NewsletterPopup() {
                 <h3 className="text-2xl font-black text-black uppercase tracking-tight flex items-center justify-center gap-2">
                   VOCÊ +
                   <img 
-                    src="https://i.postimg.cc/prwzf4PB/Chat-GPT-Image-15-05-2026-14-12-27.png" 
+                    src="/imagens/newsletter-popup.png" 
                     alt="USE GAT" 
                     className="h-8 w-auto object-contain"
                   />

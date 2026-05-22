@@ -90,7 +90,53 @@ const app = express();
 const PORT = 3000;
 
 app.use(cors());
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ limit: '10mb', extended: true }));
+
+// Serve uploaded static files and ensure folder exists
+const uploadsDir = path.join(process.cwd(), 'public', 'uploads');
+try {
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+} catch (e) {
+  console.error("Error creating uploads folder:", e);
+}
+app.use('/uploads', express.static(uploadsDir));
+
+// 0. Image Upload Endpoint (Converts Base64 compressed image to local file)
+app.post("/api/upload", async (req, res) => {
+  try {
+    const { image } = req.body;
+    if (!image) {
+      return res.status(400).json({ error: "Nenhuma imagem enviada." });
+    }
+
+    if (!image.startsWith("data:image")) {
+      return res.status(400).json({ error: "Formato de dados de imagem inválido." });
+    }
+
+    const matches = image.match(/^data:image\/([A-Za-z\-+]+);base64,(.+)$/);
+    if (!matches || matches.length !== 3) {
+      return res.status(400).json({ error: "Erro ao decodificar imagem base64." });
+    }
+
+    const ext = matches[1] === 'jpeg' ? 'jpg' : matches[1];
+    const buffer = Buffer.from(matches[2], 'base64');
+    const filename = `img_${Date.now()}_${Math.floor(Math.random() * 1000)}.${ext}`;
+    const filePath = path.join(uploadsDir, filename);
+
+    fs.writeFileSync(filePath, buffer);
+    console.log(`[Upload] Imagem salva localmente com sucesso: /uploads/${filename}`);
+
+    res.json({
+      imageUrl: `/uploads/${filename}`
+    });
+  } catch (error) {
+    console.error("Local Upload API Error:", error);
+    res.status(500).json({ error: "Erro ao processar e salvar a imagem." });
+  }
+});
 
 // 1. Shipping Calculation Endpoint
 app.get("/api/shipping/:cep", async (req, res) => {
@@ -1190,15 +1236,36 @@ app.post("/api/chat", async (req, res) => {
 async function subtractStock(produtos: any[]) {
   try {
     for (const p of produtos) {
-      // Find product by id (sku is id.toUpperCase())
-      const productId = p.sku.toLowerCase();
-      const productRef = db.collection('products').doc(productId);
-      const productSnap = await productRef.get();
+      if (!p.sku) continue;
+      
+      const skuLower = p.sku.toLowerCase();
+      // Try by matching doc reference directly first
+      let productRef = db.collection('products').doc(skuLower);
+      let productSnap = await productRef.get();
+      
+      if (!productSnap.exists) {
+        // Search by 'sku' field (allowing case changes)
+        const qSku = await db.collection('products').where('sku', '==', p.sku).limit(1).get();
+        if (!qSku.empty) {
+          productRef = qSku.docs[0].ref;
+          productSnap = qSku.docs[0];
+        } else {
+          // If not found by SKU, find by Name
+          const qName = await db.collection('products').where('name', '==', p.nome).limit(1).get();
+          if (!qName.empty) {
+            productRef = qName.docs[0].ref;
+            productSnap = qName.docs[0];
+          }
+        }
+      }
       
       if (productSnap.exists) {
         const currentStock = productSnap.data()?.stock || 0;
         const newStock = Math.max(0, currentStock - p.quantidade);
         await productRef.update({ stock: newStock });
+        console.log(`[Estoque] Reduzido estoque de "${p.nome}" (SKU: ${p.sku}) de ${currentStock} para ${newStock}.`);
+      } else {
+        console.warn(`[Estoque] Produto "${p.nome}" (SKU: ${p.sku}) não localizado no banco para debitar estoque.`);
       }
     }
   } catch (error) {

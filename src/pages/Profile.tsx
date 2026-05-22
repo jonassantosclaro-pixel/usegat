@@ -100,7 +100,13 @@ export default function Profile() {
         <div className="lg:w-1/3 space-y-8">
           <div className="bg-white rounded-[40px] p-8 shadow-xl">
             <div className="flex items-center gap-4 mb-8">
-              <img src={user.photoURL || ''} className="w-16 h-16 rounded-full border-4 border-brand-yellow" alt="Avatar" />
+              {user.photoURL ? (
+                <img src={user.photoURL} className="w-16 h-16 rounded-full border-4 border-brand-yellow object-cover" alt="Avatar" />
+              ) : (
+                <div className="w-16 h-16 rounded-full border-4 border-brand-yellow flex items-center justify-center bg-brand-pink-light text-[#4D1D54] font-black text-xl">
+                  {user.displayName ? user.displayName.charAt(0).toUpperCase() : 'U'}
+                </div>
+              )}
               <div>
                 <h2 className="text-xl font-black uppercase italic tracking-tighter">{user.displayName}</h2>
                 <p className="text-xs font-bold text-gray-400">{user.email}</p>

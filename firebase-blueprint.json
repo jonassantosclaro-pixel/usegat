@@ -65,6 +65,19 @@
         "address": { "type": "string" },
         "phone": { "type": "string" }
       }
+    },
+    "Coupon": {
+      "title": "Coupon",
+      "description": "Discount coupons system",
+      "type": "object",
+      "properties": {
+        "code": { "type": "string" },
+        "type": { "type": "string", "enum": ["percentage", "value"] },
+        "value": { "type": "number" },
+        "active": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["code", "type", "value", "active"]
     }
   },
   "firestore": {
@@ -83,6 +96,10 @@
     "/settings": {
       "schema": "Settings",
       "description": "Global application settings"
+    },
+    "/coupons": {
+      "schema": "Coupon",
+      "description": "Store discount coupons"
     }
   }
 }

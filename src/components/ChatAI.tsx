@@ -63,7 +63,7 @@ export default function ChatAI() {
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.9 }}
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-8 right-8 z-[110] bg-brand-primary text-white p-4 rounded-full shadow-2xl flex items-center justify-center group border-2 border-white/20"
+        className="fixed bottom-24 lg:bottom-8 right-8 z-[110] bg-brand-primary text-white p-4 rounded-full shadow-2xl flex items-center justify-center group border-2 border-white/20"
         aria-label="Chat IA"
       >
         <Bot className="w-8 h-8" />
@@ -82,7 +82,7 @@ export default function ChatAI() {
             initial={{ opacity: 0, y: 100, scale: 0.8 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 100, scale: 0.8 }}
-            className="fixed bottom-24 right-8 z-[120] w-[90vw] sm:w-[400px] h-[600px] bg-white rounded-[40px] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-brand-pink-light overflow-hidden flex flex-col"
+            className="fixed bottom-40 lg:bottom-24 right-8 z-[120] w-[90vw] sm:w-[400px] h-[600px] bg-white rounded-[40px] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-brand-pink-light overflow-hidden flex flex-col"
           >
             {/* Header */}
             <div className="bg-brand-primary p-6 text-white flex items-center justify-between">

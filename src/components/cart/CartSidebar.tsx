@@ -9,7 +9,7 @@ import { collection, limit, query, getDocs } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 
 export default function CartSidebar() {
-  const { isSidebarOpen, setIsSidebarOpen, items, updateQuantity, removeItem, total } = useCart();
+  const { isSidebarOpen, setIsSidebarOpen, items, updateQuantity, removeItem, total, subtotal, discountAmount, appliedCoupon } = useCart();
   const [suggestions, setSuggestions] = useState<any[]>([]);
   const navigate = useNavigate();
 
@@ -22,8 +22,8 @@ export default function CartSidebar() {
     if (isSidebarOpen) fetchSuggestions();
   }, [isSidebarOpen]);
 
-  const discount = total >= 300 ? total * 0.1 : total >= 200 ? total * 0.05 : 0;
-  const finalTotal = total - discount;
+  const progressiveDiscount = subtotal >= 300 ? subtotal * 0.1 : subtotal >= 200 ? subtotal * 0.05 : 0;
+  const finalTotal = Math.max(0, subtotal - progressiveDiscount - discountAmount);
 
   return (
     <AnimatePresence>
@@ -76,7 +76,7 @@ export default function CartSidebar() {
                 items.map((item, idx) => (
                   <div key={`${item.id}-${idx}`} className="flex gap-4 group">
                     <div className="w-20 h-20 bg-brand-gray rounded-2xl overflow-hidden shrink-0 border-2 border-transparent group-hover:border-brand-yellow transition-all">
-                      <img src={item.imageUrl} className="w-full h-full object-cover" />
+                      <img src={item.imageUrl || "/imagens/mugs-boho.jpg"} className="w-full h-full object-cover" />
                     </div>
                     <div className="flex-1">
                       <h4 className="font-black text-xs uppercase italic truncate max-w-[180px]">{item.name}</h4>
@@ -109,7 +109,7 @@ export default function CartSidebar() {
                   <div className="grid grid-cols-2 gap-4">
                     {suggestions.map(s => (
                       <Link to={`/produto/${s.id}`} key={s.id} className="bg-white p-3 rounded-2xl border border-brand-gray hover:border-brand-yellow transition-all">
-                        <img src={s.imageUrl} className="w-full h-20 object-cover rounded-xl mb-2" />
+                        <img src={s.imageUrl || "/imagens/mugs-boho.jpg"} className="w-full h-20 object-cover rounded-xl mb-2" />
                         <p className="text-[9px] font-black uppercase truncate">{s.name}</p>
                         <p className="text-[10px] font-bold text-brand-red">{formatPrice(s.price)}</p>
                       </Link>
@@ -123,18 +123,24 @@ export default function CartSidebar() {
             {items.length > 0 && (
               <div className="p-8 bg-white border-t border-brand-gray space-y-6">
                 {/* Progressive Discount Info */}
-                <div className="bg-brand-yellow/10 p-4 rounded-2xl border border-brand-yellow/20">
+                <div className="bg-[#FAF7F8]/80 p-4 rounded-2xl border border-brand-pink-medium/10">
                   <div className="flex justify-between text-[10px] font-black uppercase mb-1">
                     <span>Subtotal</span>
-                    <span>{formatPrice(total)}</span>
+                    <span>{formatPrice(subtotal)}</span>
                   </div>
-                  {discount > 0 && (
+                  {progressiveDiscount > 0 && (
                     <div className="flex justify-between text-[10px] font-black uppercase text-green-600 mb-1">
                       <span>Desconto Progressivo</span>
-                      <span>-{formatPrice(discount)}</span>
+                      <span>-{formatPrice(progressiveDiscount)}</span>
                     </div>
                   )}
-                  <div className="flex justify-between text-lg font-black uppercase tracking-tighter pt-2 border-t border-brand-yellow/20 mt-2">
+                  {discountAmount > 0 && (
+                    <div className="flex justify-between text-[10px] font-black uppercase text-[#4D1D54] mb-1">
+                      <span>Cupom ({appliedCoupon?.code})</span>
+                      <span>-{formatPrice(discountAmount)}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-lg font-black uppercase tracking-tighter pt-2 border-t border-brand-pink-medium/10 mt-2">
                     <span>Total</span>
                     <span className="text-brand-red">{formatPrice(finalTotal)}</span>
                   </div>

@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { useCart } from '@/src/lib/CartContext';
+import axios from 'axios';
 import { formatPrice, cn } from '@/src/lib/utils';
 import { 
   ShoppingBag, 
@@ -92,6 +93,9 @@ export default function ProductDetails() {
   const [selectedMomentos, setSelectedMomentos] = useState<string[]>([]);
   const [selectedDiversos, setSelectedDiversos] = useState<string[]>([]);
 
+  // Individual item typed detailed custom specifications requested by user
+  const [itemCustomTexts, setItemCustomTexts] = useState<Record<string, string>>({});
+
   // State for 'Outros' text fields
   const [comidasOutros, setComidasOutros] = useState('');
   const [bebidasOutros, setBebidasOutros] = useState('');
@@ -120,6 +124,61 @@ export default function ProductDetails() {
 
   // General error checklist
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+
+  // CEP Shipping Calculator
+  const [cep, setCep] = useState('');
+  const [shippingLoading, setShippingLoading] = useState(false);
+  const [shippingResult, setShippingResult] = useState<{ cost: number; address: any } | null>(null);
+  const [shippingError, setShippingError] = useState('');
+
+  const handleCalculateShipping = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const cleanCep = cep.replace(/\D/g, '');
+    if (cleanCep.length !== 8) {
+      setShippingError('Por favor, informe um CEP válido com 8 dígitos.');
+      setShippingResult(null);
+      return;
+    }
+
+    setShippingLoading(true);
+    setShippingError('');
+    setShippingResult(null);
+
+    try {
+      const response = await axios.get(`/api/shipping/${cleanCep}`);
+      const { cost, address } = response.data;
+      setShippingResult({ cost, address });
+    } catch (error) {
+      console.warn("Erro ao buscar CEP via backend, usando fallback ViaCEP direto:", error);
+      try {
+        const viaCepRes = await fetch(`https://viacep.com.br/ws/${cleanCep}/json/`);
+        if (viaCepRes.ok) {
+          const data = await viaCepRes.json();
+          if (!data.erro) {
+            const fallbackCost = 18.00;
+            setShippingResult({
+              cost: fallbackCost,
+              address: {
+                rua: data.logradouro || '',
+                cidade: data.localidade || '',
+                estado: data.uf || '',
+                bairro: data.bairro || ''
+              }
+            });
+          } else {
+            setShippingError('CEP não encontrado.');
+          }
+        } else {
+          setShippingError('Erro ao buscar o CEP.');
+        }
+      } catch (fallbackError) {
+        console.error("Erro no fallback do CEP:", fallbackError);
+        setShippingError('Não foi possível calcular o frete para este CEP.');
+      }
+    } finally {
+      setShippingLoading(false);
+    }
+  };
 
   const calculateFontSize = (text: string, category: string) => {
     const len = text.length;
@@ -194,6 +253,11 @@ export default function ProductDetails() {
   const handleAddToCart = () => {
     // Perform validations
     const errors: string[] = [];
+
+    if (product?.stock !== undefined && product.stock <= 0) {
+      alert("Desculpe, este produto está temporariamente fora de estoque.");
+      return;
+    }
     
     if (product?.isSuaHistoria) {
       if (!customName.trim()) errors.push("Por favor, preencha o campo de Nome.");
@@ -230,12 +294,30 @@ export default function ProductDetails() {
         frase: customPhrase,
         fonte: selectedFont,
         elementsStyle,
-        comidas: selectedComidas.map(x => x === 'Outros' ? `Outros (${comidasOutros})` : x).join(', '),
-        bebidas: selectedBebidas.map(x => x === 'Outros' ? `Outros (${bebidasOutros})` : x).join(', '),
-        entretenimento: selectedEntretenimento.map(x => x === 'Outros' ? `Outros (${entretenimentoOutros})` : x).join(', '),
-        lazer: selectedLazer.map(x => x === 'Outros' ? `Outros (${lazerOutros})` : x).join(', '),
-        momentos: selectedMomentos.map(x => x === 'Outros' ? `Outros (${momentosOutros})` : x).join(', '),
-        diversos: selectedDiversos.map(x => x === 'Outros' ? `Outros (${diversosOutros})` : x).join(', '),
+        comidas: selectedComidas.map(x => {
+          const detail = x === 'Outros' ? comidasOutros : itemCustomTexts[x];
+          return detail?.trim() ? `${x} (${detail.trim()})` : x;
+        }).join(', '),
+        bebidas: selectedBebidas.map(x => {
+          const detail = x === 'Outros' ? bebidasOutros : itemCustomTexts[x];
+          return detail?.trim() ? `${x} (${detail.trim()})` : x;
+        }).join(', '),
+        entretenimento: selectedEntretenimento.map(x => {
+          const detail = x === 'Outros' ? entretenimentoOutros : itemCustomTexts[x];
+          return detail?.trim() ? `${x} (${detail.trim()})` : x;
+        }).join(', '),
+        lazer: selectedLazer.map(x => {
+          const detail = x === 'Outros' ? lazerOutros : itemCustomTexts[x];
+          return detail?.trim() ? `${x} (${detail.trim()})` : x;
+        }).join(', '),
+        momentos: selectedMomentos.map(x => {
+          const detail = x === 'Outros' ? momentosOutros : itemCustomTexts[x];
+          return detail?.trim() ? `${x} (${detail.trim()})` : x;
+        }).join(', '),
+        diversos: selectedDiversos.map(x => {
+          const detail = x === 'Outros' ? diversosOutros : itemCustomTexts[x];
+          return detail?.trim() ? `${x} (${detail.trim()})` : x;
+        }).join(', '),
         caricatura: hasCaricatura ? {
           qtd: caricaturasQtd,
           estilo: caricaturaEstilo,
@@ -287,7 +369,7 @@ export default function ProductDetails() {
           >
             <div className="relative w-full h-full flex items-center justify-center garrafa-preview">
               <img 
-                src={product.imageUrl} 
+                src={product.imageUrl || "/imagens/mugs-boho.jpg"} 
                 alt={product.name}
                 className="w-full h-full object-contain relative z-10 transition-transform duration-500 hover:scale-105"
               />
@@ -419,6 +501,17 @@ export default function ProductDetails() {
             <p className="text-[10px] font-black uppercase tracking-wide text-[#8C6A3B]">
               Em até 3x de {formatPrice(productFinalPrice / 3)} sem juros no cartão
             </p>
+            {product?.stock !== undefined && (
+              <div className="pt-2 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
+                {product.stock === 0 ? (
+                  <span className="text-red-500 bg-red-50 border border-red-200 px-3 py-1.5 rounded-full text-[10px] font-black leading-none flex items-center gap-1">❌ Fora de Estoque (Esgotado)</span>
+                ) : product.stock <= 5 ? (
+                  <span className="text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full text-[10px] font-black leading-none flex items-center gap-1">⚠️ Apenas {product.stock} unidades em estoque!</span>
+                ) : (
+                  <span className="text-green-600 bg-green-50 border border-green-200 px-3 py-1.5 rounded-full text-[10px] font-black leading-none flex items-center gap-1">✓ Em Estoque ({product.stock} disponíveis)</span>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Validation Checklist Errors */}
@@ -542,7 +635,7 @@ export default function ProductDetails() {
                             className={cn(
                               "relative px-4 py-5 rounded-2xl border text-center transition-all duration-200 cursor-pointer flex flex-col justify-center items-center select-none shadow-sm gap-1.5",
                               isActive
-                                ? "border-[#4D1D54] bg-[#4D1D54]/5 text-[#4D1D54] ring-1 ring-[#4D1D54]"
+                                ? "border-[#4D1D54] bg-[#4D1D54] text-white ring-1 ring-[#4D1D54] shadow-md transform scale-[1.02]"
                                 : "border-gray-200 bg-white text-brand-black hover:border-brand-gold/40 hover:bg-stone-50"
                             )}
                           >
@@ -555,11 +648,14 @@ export default function ProductDetails() {
                             >
                               Amor
                             </span>
-                            <span className="text-[9px] font-black tracking-wider uppercase text-gray-400">
+                            <span className={cn(
+                              "text-[9px] font-black tracking-wider uppercase",
+                              isActive ? "text-white/80" : "text-gray-400"
+                            )}>
                               {font.name}
                             </span>
                             {isActive && (
-                              <div className="absolute top-2 right-2 w-3.5 h-3.5 bg-[#4D1D54] rounded-full flex items-center justify-center text-white text-[8px] font-bold">
+                              <div className="absolute top-2 right-2 w-4 h-4 bg-white text-[#4D1D54] rounded-full flex items-center justify-center text-[9px] font-black shadow-sm">
                                 ✓
                               </div>
                             )}
@@ -586,6 +682,28 @@ export default function ProductDetails() {
                       min={5} 
                       max={10} 
                     />
+                    <div className="space-y-2 mt-2">
+                      <AnimatePresence>
+                        {selectedComidas.filter(x => x !== 'Outros').map((item) => (
+                          <motion.div
+                            key={item}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="pl-3 border-l-2 border-brand-gold/50 py-1"
+                          >
+                            <label className="text-[10px] font-black uppercase text-brand-gold tracking-wider block mb-1">✍ Detalhes para "{item}"</label>
+                            <input
+                              type="text"
+                              value={itemCustomTexts[item] || ''}
+                              onChange={(e) => setItemCustomTexts(prev => ({ ...prev, [item]: e.target.value }))}
+                              placeholder={`Especificações de preferência para ${item}...`}
+                              className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl px-4 py-2.5 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                            />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
                     {selectedComidas.includes("Outros") && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
@@ -613,6 +731,28 @@ export default function ProductDetails() {
                       min={3} 
                       max={5} 
                     />
+                    <div className="space-y-2 mt-2">
+                      <AnimatePresence>
+                        {selectedBebidas.filter(x => x !== 'Outros').map((item) => (
+                          <motion.div
+                            key={item}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="pl-3 border-l-2 border-brand-gold/50 py-1"
+                          >
+                            <label className="text-[10px] font-black uppercase text-brand-gold tracking-wider block mb-1">✍ Detalhes para "{item}"</label>
+                            <input
+                              type="text"
+                              value={itemCustomTexts[item] || ''}
+                              onChange={(e) => setItemCustomTexts(prev => ({ ...prev, [item]: e.target.value }))}
+                              placeholder={`Especificações de preferência para ${item}...`}
+                              className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl px-4 py-2.5 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                            />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
                     {selectedBebidas.includes("Outros") && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
@@ -640,6 +780,28 @@ export default function ProductDetails() {
                       min={2} 
                       max={5} 
                     />
+                    <div className="space-y-2 mt-2">
+                      <AnimatePresence>
+                        {selectedEntretenimento.filter(x => x !== 'Outros').map((item) => (
+                          <motion.div
+                            key={item}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="pl-3 border-l-2 border-brand-gold/50 py-1"
+                          >
+                            <label className="text-[10px] font-black uppercase text-brand-gold tracking-wider block mb-1">✍ Detalhes para "{item}"</label>
+                            <input
+                              type="text"
+                              value={itemCustomTexts[item] || ''}
+                              onChange={(e) => setItemCustomTexts(prev => ({ ...prev, [item]: e.target.value }))}
+                              placeholder={`Especificações de preferência para ${item}...`}
+                              className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl px-4 py-2.5 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                            />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
                     {selectedEntretenimento.includes("Outros") && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
@@ -667,6 +829,28 @@ export default function ProductDetails() {
                       min={5} 
                       max={10} 
                     />
+                    <div className="space-y-2 mt-2">
+                      <AnimatePresence>
+                        {selectedLazer.filter(x => x !== 'Outros').map((item) => (
+                          <motion.div
+                            key={item}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="pl-3 border-l-2 border-brand-gold/50 py-1"
+                          >
+                            <label className="text-[10px] font-black uppercase text-brand-gold tracking-wider block mb-1">✍ Detalhes para "{item}"</label>
+                            <input
+                              type="text"
+                              value={itemCustomTexts[item] || ''}
+                              onChange={(e) => setItemCustomTexts(prev => ({ ...prev, [item]: e.target.value }))}
+                              placeholder={`Especificações de preferência para ${item}...`}
+                              className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl px-4 py-2.5 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                            />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
                     {selectedLazer.includes("Outros") && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
@@ -694,6 +878,28 @@ export default function ProductDetails() {
                       min={3} 
                       max={5} 
                     />
+                    <div className="space-y-2 mt-2">
+                      <AnimatePresence>
+                        {selectedMomentos.filter(x => x !== 'Outros').map((item) => (
+                          <motion.div
+                            key={item}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="pl-3 border-l-2 border-brand-gold/50 py-1"
+                          >
+                            <label className="text-[10px] font-black uppercase text-brand-gold tracking-wider block mb-1">✍ Detalhes para "{item}"</label>
+                            <input
+                              type="text"
+                              value={itemCustomTexts[item] || ''}
+                              onChange={(e) => setItemCustomTexts(prev => ({ ...prev, [item]: e.target.value }))}
+                              placeholder={`Especificações de preferência para ${item}...`}
+                              className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl px-4 py-2.5 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                            />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
                     {selectedMomentos.includes("Outros") && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
@@ -721,6 +927,28 @@ export default function ProductDetails() {
                       min={2} 
                       max={5} 
                     />
+                    <div className="space-y-2 mt-2">
+                      <AnimatePresence>
+                        {selectedDiversos.filter(x => x !== 'Outros').map((item) => (
+                          <motion.div
+                            key={item}
+                            initial={{ opacity: 0, height: 0 }}
+                            animate={{ opacity: 1, height: "auto" }}
+                            exit={{ opacity: 0, height: 0 }}
+                            className="pl-3 border-l-2 border-brand-gold/50 py-1"
+                          >
+                            <label className="text-[10px] font-black uppercase text-brand-gold tracking-wider block mb-1">✍ Detalhes para "{item}"</label>
+                            <input
+                              type="text"
+                              value={itemCustomTexts[item] || ''}
+                              onChange={(e) => setItemCustomTexts(prev => ({ ...prev, [item]: e.target.value }))}
+                              placeholder={`Especificações de preferência para ${item}...`}
+                              className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-2xl px-4 py-2.5 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                            />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
                     {selectedDiversos.includes("Outros") && (
                       <motion.div
                         initial={{ opacity: 0, height: 0 }}
@@ -842,14 +1070,16 @@ export default function ProductDetails() {
               <div className="flex items-center border border-brand-pink-medium rounded-full overflow-hidden h-14 w-full sm:w-40 bg-[#FAF7F8]/80 backdrop-blur-sm shadow-inner">
                 <button 
                   onClick={() => setQuantity(Math.max(1, quantity - 1))}
-                  className="flex-grow font-black text-xl hover:bg-brand-pink-medium text-brand-primary"
+                  disabled={product?.stock !== undefined && product.stock <= 0}
+                  className="flex-grow font-black text-xl hover:bg-brand-pink-medium text-brand-primary disabled:opacity-40"
                 >
                   -
                 </button>
                 <span className="font-bold text-sm w-12 text-center">{quantity}</span>
                 <button 
                   onClick={() => setQuantity(quantity + 1)}
-                  className="flex-grow font-black text-xl hover:bg-brand-pink-medium text-brand-primary"
+                  disabled={product?.stock !== undefined && product.stock <= 0}
+                  className="flex-grow font-black text-xl hover:bg-brand-pink-medium text-brand-primary disabled:opacity-40"
                 >
                   +
                 </button>
@@ -857,11 +1087,200 @@ export default function ProductDetails() {
               
               <button 
                 onClick={handleAddToCart}
-                className="flex-grow bg-brand-primary text-white h-14 rounded-full font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 hover:bg-brand-primary-light hover:scale-105 active:scale-95 transition-all shadow-xl"
+                disabled={product?.stock !== undefined && product.stock <= 0}
+                className="flex-grow bg-brand-primary text-white h-14 rounded-full font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-3 hover:bg-brand-primary-light hover:scale-105 active:scale-95 transition-all shadow-xl disabled:bg-gray-300 disabled:text-gray-500 disabled:cursor-not-allowed disabled:scale-100 disabled:hover:scale-100 disabled:shadow-none"
               >
                 <ShoppingBag className="w-5 h-5" />
-                Adicionar ao Carrinho
+                {product?.stock !== undefined && product.stock <= 0 ? "Esgotado / Sem Estoque" : "Adicionar ao Carrinho"}
               </button>
+            </div>
+          </div>
+
+          {/* Shipping Calculator Block */}
+          <div className="mt-8 pt-8 border-t border-brand-pink-medium/20 space-y-4">
+            <div className="flex items-center gap-2 text-[#4D1D54]">
+              <Truck className="w-5 h-5 animate-pulse" />
+              <h4 className="font-serif italic font-black text-lg">Calcular Frete</h4>
+            </div>
+            
+            <p className="text-[11px] font-bold text-stone-500 uppercase tracking-widest leading-normal">
+              Insira o seu CEP para calcular o prazo e valor de entrega estimado para sua região:
+            </p>
+
+            <form onSubmit={handleCalculateShipping} className="flex gap-2">
+              <input
+                type="text"
+                placeholder="DIGITE SEU CEP (Ex: 01311-200)"
+                maxLength={9}
+                value={cep}
+                onChange={(e) => {
+                  let val = e.target.value.replace(/\D/g, '');
+                  if (val.length > 5) {
+                    val = `${val.slice(0, 5)}-${val.slice(5, 8)}`;
+                  }
+                  setCep(val);
+                }}
+                className="flex-grow bg-[#FAF7F8]/80 border border-brand-pink-medium/20 rounded-2xl px-4 py-3 placeholder-[#4D1D54]/30 text-xs font-black uppercase tracking-widest text-[#4D1D54] outline-none focus:border-[#4D1D54] focus:bg-white transition-all shadow-sm"
+              />
+              <button
+                type="submit"
+                disabled={shippingLoading}
+                className="bg-[#4D1D54] hover:bg-[#6c2877] text-white px-6 rounded-2xl text-[10px] font-black uppercase tracking-widest transition-all shadow-md disabled:opacity-50 shrink-0"
+              >
+                {shippingLoading ? '...' : 'CALCULAR'}
+              </button>
+            </form>
+
+            {shippingError && (
+              <div className="bg-red-50 text-red-600 border border-red-100 p-3 rounded-2xl text-[11px] font-bold uppercase tracking-wide flex items-center gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{shippingError}</span>
+              </div>
+            )}
+
+            {shippingResult && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-[#FAF7F8]/90 border border-brand-pink-medium/10 rounded-2xl p-4 space-y-2.5 shadow-sm"
+              >
+                <div className="flex justify-between items-baseline">
+                  <span className="text-[10px] font-black text-[#8C6A3B] uppercase tracking-wider">Valor do Frete:</span>
+                  <span className="text-lg font-black text-[#4D1D54]">{shippingResult.cost === 0 ? 'Grátis!' : formatPrice(shippingResult.cost)}</span>
+                </div>
+                
+                {shippingResult.address && (
+                  <div className="text-[11px] text-stone-600 leading-normal font-medium border-t border-dashed border-stone-200/60 pt-2 space-y-0.5">
+                    <p className="font-extrabold text-[#4D1D54] uppercase tracking-wide text-[9px] mb-1">📍 Endereço de Entrega:</p>
+                    {shippingResult.address.rua && <p>{shippingResult.address.rua}</p>}
+                    <p>
+                      {shippingResult.address.bairro && `${shippingResult.address.bairro} - `}
+                      {shippingResult.address.cidade} / {shippingResult.address.estado}
+                    </p>
+                    <p className="text-[10px] text-green-600 font-bold uppercase tracking-wider mt-1.5 flex items-center gap-1">
+                      <span>✓ Prazo de produção: 5 a 7 dias úteis + envio</span>
+                    </p>
+                  </div>
+                )}
+              </motion.div>
+            )}
+          </div>
+
+          {/* Infográfico: Como pedir mais de um item */}
+          <div className="mt-8 pt-8 border-t border-brand-pink-medium/20 space-y-6">
+            <div className="bg-[#FAF7F8]/90 border border-brand-pink-medium/25 rounded-[2.5rem] p-6 sm:p-8 space-y-6 shadow-sm relative overflow-hidden">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-brand-pink-medium/5 rounded-full blur-2xl pointer-events-none" />
+              
+              <div className="text-center space-y-2">
+                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8C6A3B] block">Dicas de Personalização</span>
+                <h4 className="text-xl font-serif font-black text-[#4D1D54] italic leading-tight">
+                  Deseja mais de um item do mesmo modelo?
+                </h4>
+                <p className="text-[11px] font-medium text-stone-600 leading-relaxed max-w-md mx-auto">
+                  O campo de personalização deve ser preenchido apenas uma vez. Caso queira mais de um item do mesmo modelo, deixamos a sugestão abaixo :)
+                </p>
+              </div>
+
+              {/* Step 1 & Step 2 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-2">
+                
+                {/* Passo 1 Card */}
+                <div className="bg-white rounded-3xl p-5 border border-brand-pink-medium/10 space-y-3 relative shadow-inner">
+                  <div className="absolute -top-3 -left-2 w-7 h-7 rounded-full bg-[#8C6A3B] text-white flex items-center justify-center font-black text-xs shadow-md">
+                    1
+                  </div>
+                  <h5 className="text-[11px] font-black uppercase text-[#8C6A3B] pl-4">Adicione a quantidade desejada</h5>
+                  <p className="text-[10px] text-stone-500 font-medium leading-normal">
+                    Selecione no contador a quantidade total de mimos correspondente.
+                  </p>
+                  
+                  {/* Visual Simulation of the counter */}
+                  <div className="flex justify-center pt-2">
+                    <div className="flex items-center gap-4 bg-[#FAF7F8] px-4 py-1.5 rounded-full border border-stone-200 select-none">
+                      <span className="text-stone-400 font-mono text-xs">-</span>
+                      <span className="font-serif italic font-black text-stone-900 text-sm">3</span>
+                      <span className="text-stone-400 font-mono text-xs">+</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Passo 2 Card */}
+                <div className="bg-white rounded-3xl p-5 border border-brand-pink-medium/10 space-y-3 relative shadow-inner">
+                  <div className="absolute -top-3 -left-2 w-7 h-7 rounded-full bg-[#8C6A3B] text-white flex items-center justify-center font-black text-xs shadow-md">
+                    2
+                  </div>
+                  <h5 className="text-[11px] font-black uppercase text-[#8C6A3B] pl-4">Informe os nomes/frases</h5>
+                  <p className="text-[10px] text-stone-500 font-medium leading-normal">
+                    Separe no campo de texto de acordo com cada item de sua preferência.
+                  </p>
+                  
+                  {/* Simulated Form Field */}
+                  <div className="bg-[#FAF7F8] p-3 rounded-2xl border border-dashed border-brand-pink-medium/30 text-[9px] font-mono text-stone-500 leading-tight">
+                    <p className="font-bold text-[#4D1D54] mb-1 text-[10px]">Frente e Verso:</p>
+                    <p><span className="font-extrabold text-stone-700">Copo 1:</span> Andreza / "Seja forte..."</p>
+                    <p><span className="font-extrabold text-stone-700">Copo 2:</span> Claudia / "Seja corajosa!"</p>
+                    <p><span className="font-extrabold text-stone-700">Copo 3:</span> Luana / "Linda de si"</p>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Step 3 & Step 4 */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                
+                {/* Passo 3 Card */}
+                <div className="bg-white rounded-3xl p-5 border border-brand-pink-medium/10 space-y-3 relative shadow-inner">
+                  <div className="absolute -top-3 -left-2 w-7 h-7 rounded-full bg-[#8C6A3B] text-white flex items-center justify-center font-black text-xs shadow-md">
+                    3
+                  </div>
+                  <h5 className="text-[11px] font-black uppercase text-[#8C6A3B] pl-4">Adicione à sacola</h5>
+                  <p className="text-[10px] text-stone-500 font-medium leading-normal">
+                    Envie todos os mimos personalizados juntos para a sua sacola de uma só vez!
+                  </p>
+                  
+                  {/* Simulated Button Action */}
+                  <div className="flex justify-center pt-2">
+                    <div className="bg-[#B48A4E] text-white rounded-full px-5 py-2 text-[9px] font-black uppercase tracking-wider shadow-sm flex items-center gap-1.5 select-none">
+                      <ShoppingBag className="w-3 h-3" />
+                      Adicionar ao carrinho
+                    </div>
+                  </div>
+                </div>
+
+                {/* Passo 4 Card */}
+                <div className="bg-white rounded-3xl p-5 border border-brand-pink-medium/10 space-y-3 relative shadow-inner">
+                  <div className="absolute -top-3 -left-2 w-7 h-7 rounded-full bg-[#8C6A3B] text-white flex items-center justify-center font-black text-xs shadow-md">
+                    4
+                  </div>
+                  <h5 className="text-[11px] font-black uppercase text-[#8C6A3B] pl-4">Confirme e Finalize</h5>
+                  <p className="text-[10px] text-stone-500 font-medium leading-normal">
+                    Confira atenciosamente os mimos no carrinho antes de ir ao pagamento.
+                  </p>
+                  
+                  {/* Simulated Cart Item */}
+                  <div className="bg-[#FAF7F8] p-3 rounded-2xl border border-stone-100 text-[9px] leading-tight space-y-1">
+                    <p className="font-bold text-stone-700 truncate">Garrafa Térmica Classic Amplo Vácuo</p>
+                    <div className="flex justify-between font-mono text-[8px] text-stone-400">
+                      <span>Quantidade: 3</span>
+                      <span className="font-extrabold text-[#4D1D54]">R$ 417,00</span>
+                    </div>
+                  </div>
+                </div>
+
+              </div>
+
+              {/* Heart and End Line */}
+              <div className="pt-4 border-t border-brand-pink-medium/15 text-center flex flex-col items-center gap-1">
+                <p className="font-serif italic font-bold text-xs text-[#4D1D54] uppercase tracking-wide">
+                  Tudo será feito com muito amor!
+                </p>
+                <div className="flex gap-2 text-red-500 text-xs mt-1">
+                  <span>♥️</span>
+                  <span>♥️</span>
+                  <span>♥️</span>
+                </div>
+              </div>
+
             </div>
           </div>
         </div>

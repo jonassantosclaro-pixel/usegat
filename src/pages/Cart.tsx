@@ -8,13 +8,18 @@ import { useState } from 'react';
 import CheckoutForm from '../components/CheckoutForm';
 import { PaymentMethods } from '../components/cart/PaymentMethods';
 import axios from 'axios';
+import { collection, query, where, getDocs } from 'firebase/firestore';
+import { db } from '@/src/lib/firebase';
 
 export default function Cart() {
-  const { items, removeItem, total, clearCart } = useCart();
+  const { items, removeItem, total, clearCart, subtotal, discountAmount, appliedCoupon, applyCoupon } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showCheckout, setShowCheckout] = useState(false);
   const [shippingCost, setShippingCost] = useState(0);
+
+  const [couponInput, setCouponInput] = useState('');
+  const [couponLoading, setCouponLoading] = useState(false);
 
   // Custom Gift wraps state (+R$ 9,90)
   const [addGiftWrap, setAddGiftWrap] = useState(false);
@@ -55,18 +60,49 @@ export default function Cart() {
   };
 
   // Advanced Progressive discounts
-  const discount = total >= 300 ? total * 0.1 : total >= 200 ? total * 0.05 : 0;
+  const progressiveDiscount = subtotal >= 300 ? subtotal * 0.1 : subtotal >= 200 ? subtotal * 0.05 : 0;
   const giftWrapTotal = addGiftWrap ? items.reduce((acc, item) => acc + (item.customization ? 9.90 * item.quantity : 0), 0) : 0;
 
   // Free shipping guide
   const FREE_SHIPPING_LIMIT = 150;
-  const differenceToFreeShipping = FREE_SHIPPING_LIMIT - total;
-  const isFreeShipping = total >= FREE_SHIPPING_LIMIT;
-  const freeShippingProgress = Math.min((total / FREE_SHIPPING_LIMIT) * 100, 100);
+  const differenceToFreeShipping = FREE_SHIPPING_LIMIT - subtotal;
+  const isFreeShipping = subtotal >= FREE_SHIPPING_LIMIT;
+  const freeShippingProgress = Math.min((subtotal / FREE_SHIPPING_LIMIT) * 100, 100);
 
   const activeShippingCost = isFreeShipping ? 0 : (showCheckout ? shippingCost : 18.00);
-  const finalSubtotal = total - discount + giftWrapTotal;
+  const finalSubtotal = Math.max(0, subtotal - progressiveDiscount - discountAmount + giftWrapTotal);
   const finalTotal = finalSubtotal + activeShippingCost;
+
+  const handleApplyCoupon = async () => {
+    if (!couponInput.trim()) return;
+    setCouponLoading(true);
+    try {
+      const q = query(
+        collection(db, 'coupons'), 
+        where('code', '==', couponInput.trim().toUpperCase()), 
+        where('active', '==', true)
+      );
+      const querySnap = await getDocs(q);
+      if (querySnap.empty) {
+        alert("Cupom inválido ou expirado.");
+        applyCoupon(null);
+      } else {
+        const docData = querySnap.docs[0].data();
+        applyCoupon({
+          code: docData.code,
+          type: docData.type,
+          value: docData.value
+        });
+        alert("Cupom aplicado com sucesso!");
+        setCouponInput('');
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Erro ao validar cupom.");
+    } finally {
+      setCouponLoading(false);
+    }
+  };
 
   // Generate WhatsApp buy message with detailed summaries
   const handleWhatsAppBuy = () => {
@@ -95,8 +131,9 @@ export default function Cart() {
     });
 
     text += `----------------------------------------\n`;
-    text += `*Subtotal:* ${formatPrice(total)}\n`;
-    if (discount > 0) text += `*Desconto Progressivo:* -${formatPrice(discount)}\n`;
+    text += `*Subtotal:* ${formatPrice(subtotal)}\n`;
+    if (progressiveDiscount > 0) text += `*Desconto Progressivo:* -${formatPrice(progressiveDiscount)}\n`;
+    if (discountAmount > 0) text += `*Cupom de Desconto:* -${formatPrice(discountAmount)} (${appliedCoupon?.code})\n`;
     if (addGiftWrap) text += `*Embalagem Especial:* R$ 9,90 por itens personalizados (${formatPrice(giftWrapTotal)})\n`;
     text += `*Frete:* ${isFreeShipping ? 'Grátis!' : formatPrice(activeShippingCost)}\n`;
     text += `*VALOR TOTAL:* ${formatPrice(finalTotal)}\n\n`;
@@ -198,7 +235,7 @@ export default function Cart() {
                   >
                     <div className="w-24 h-24 sm:w-28 sm:h-28 bg-[#FAF7F8] rounded-[2rem] overflow-hidden flex-shrink-0 p-2 flex items-center justify-center border border-stone-100">
                       <img 
-                        src={item.imageUrl} 
+                        src={item.imageUrl || "/imagens/mugs-boho.jpg"} 
                         alt={item.name} 
                         className="w-full h-full object-contain" 
                       />
@@ -318,14 +355,21 @@ export default function Cart() {
             
             <div className="space-y-4 text-xs font-bold uppercase tracking-widest text-white/75">
               <div className="flex justify-between">
-                <span>Produtos ({items.length})</span>
-                <span className="text-white">{formatPrice(total)}</span>
+                <span>Subtotal</span>
+                <span className="text-white">{formatPrice(subtotal)}</span>
               </div>
               
-              {discount > 0 && (
+              {progressiveDiscount > 0 && (
                 <div className="flex justify-between text-green-300">
                   <span>Desconto Progressivo</span>
-                  <span>-{formatPrice(discount)}</span>
+                  <span>-{formatPrice(progressiveDiscount)}</span>
+                </div>
+              )}
+
+              {discountAmount > 0 && (
+                <div className="flex justify-between text-green-300">
+                  <span>Cupom ({appliedCoupon?.code})</span>
+                  <span>-{formatPrice(discountAmount)}</span>
                 </div>
               )}
 
@@ -341,6 +385,49 @@ export default function Cart() {
                 <span className="text-white">
                   {isFreeShipping ? "Grátis!" : (showCheckout ? formatPrice(shippingCost) : "A calcular")}
                 </span>
+              </div>
+
+              {/* Coupon Applicator */}
+              <div className="pt-6 border-t border-white/10 space-y-3">
+                <span className="text-[10px] font-black uppercase tracking-widest text-white/70 block">Cupom de Desconto</span>
+                {appliedCoupon ? (
+                  <div className="flex items-center justify-between bg-white/10 p-4 rounded-2xl border border-white/20">
+                    <div>
+                      <span className="font-extrabold text-xs text-green-300 block uppercase tracking-wider">{appliedCoupon.code}</span>
+                      <span className="text-[9px] font-medium text-white/70">
+                        {appliedCoupon.type === 'percentage' 
+                          ? `${appliedCoupon.value}% de desconto` 
+                          : `${formatPrice(appliedCoupon.value)} de desconto`}
+                      </span>
+                    </div>
+                    <button 
+                      type="button"
+                      onClick={() => applyCoupon(null)}
+                      className="text-white/60 hover:text-white transition-colors hover:scale-110 p-1 bg-white/5 hover:bg-white/10 rounded-full"
+                      title="Remover cupom"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      placeholder="DIGITE SEU CUPOM"
+                      value={couponInput}
+                      onChange={(e) => setCouponInput(e.target.value.toUpperCase())}
+                      className="flex-grow bg-white/10 border border-white/20 rounded-2xl px-4 py-3 placeholder-white/40 text-xs font-black uppercase tracking-widest outline-none focus:border-white transition-colors"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleApplyCoupon}
+                      disabled={couponLoading}
+                      className="bg-[#B48A4E] hover:bg-[#c99d5c] disabled:opacity-50 text-white px-5 rounded-2xl text-[9px] font-black uppercase tracking-widest transition-all"
+                    >
+                      {couponLoading ? '...' : 'APLICAR'}
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="pt-6 border-t border-white/10 flex justify-between items-baseline">
