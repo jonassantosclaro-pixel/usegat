@@ -1,174 +1,118 @@
-import { ShoppingCart, User as UserIcon, Search, Menu, X, Instagram, Heart } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { ShoppingCart, User as UserIcon, Search, ChevronDown, MessageCircle, Mail, Clock, AlignJustify } from 'lucide-react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useAuth } from '@/src/lib/AuthContext';
 import { useCart } from '@/src/lib/CartContext';
-import { cn } from '@/src/lib/utils';
 import { motion, AnimatePresence } from 'motion/react';
 
 export default function Header() {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
-  const [isScrolled, setIsScrolled] = useState(false);
-  const { user, isAdmin, signOut } = useAuth();
+  const { user } = useAuth();
   const { items, setIsSidebarOpen } = useCart();
   const cartCount = items.reduce((acc, item) => acc + item.quantity, 0);
 
-  useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
-
-  const categories: { name: string; path: string; highlight?: boolean }[] = [
-    { name: 'Garrafas Térmicas', path: '/categoria/garrafas-termicas' },
-    { name: 'Canecas', path: '/categoria/canecas' },
-    { name: 'Atacado', path: '/categoria/atacado' },
+  const menuCategories = [
+    { 
+      name: 'Canecas', 
+      subs: ['Estilo Único', 'Para Mesa', 'Amor Por Aí'] 
+    },
+    { 
+      name: 'Garrafas Térmicas', 
+      subs: ['Meu Jeito', 'Corporativo', 'Essencial'] 
+    },
+    { 
+      name: 'Atacado', 
+      subs: ['Especiais'] 
+    },
   ];
 
   return (
-    <header className={cn(
-      "sticky top-0 z-50 transition-all duration-500",
-      isScrolled 
-        ? "bg-white/85 backdrop-blur-xl shadow-[0_4px_30px_rgba(0,0,0,0.03)] border-b border-white/40" 
-        : "bg-white border-b border-brand-pink-light"
-    )}>
-      {/* Top Bar - Urgent or promo info */}
-      <AnimatePresence>
-        {!isScrolled && (
-          <motion.div 
-            initial={{ height: 'auto', opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            className="bg-brand-primary text-white text-[10px] py-2 text-center font-bold uppercase tracking-[0.2em] px-4 overflow-hidden relative z-50"
-          >
-            <span>💘 Use o cupom <span className="font-black text-white px-2 py-0.5 bg-white/20 rounded-md">GATLOVE</span> e ganhe 10% OFF</span> 
-          </motion.div>
-        )}
-      </AnimatePresence>
+    <header className="bg-white border-b border-gray-200">
+      <div className="bg-[#6b5b50] text-white text-[10px] text-center py-1 tracking-widest uppercase">
+        💎 Tem desconto no pagamento via PIX!
+      </div>
 
-      {/* Main Header */}
-      <div className="max-w-7xl mx-auto px-6 lg:px-10">
-        <div className={cn(
-          "flex justify-between items-center transition-all duration-500",
-          isScrolled ? "h-14 sm:h-16" : "h-16 sm:h-24"
-        )}>
-          {/* Logo */}
-          <Link to="/" className="flex items-center group relative z-10">
-            <img 
-              src="/imagens/logo-gat-purple.png" 
-              alt="USE.GAT Logo" 
-              className={cn(
-                "w-auto object-contain transition-all duration-500",
-                isScrolled ? "h-8 sm:h-14" : "h-10 sm:h-20"
-              )}
-            />
-          </Link>
+      <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4 flex-wrap">
+        <div className="flex-1 min-w-[200px]">
+          <input
+            type="search"
+            placeholder="Digite o que você procura"
+            className="w-full bg-gray-100 rounded-full py-2 px-6 outline-none text-sm placeholder:text-gray-400"
+          />
+        </div>
 
-          {/* Nav - Desktop */}
-          <nav className="hidden lg:flex gap-8 font-medium text-[11px] uppercase tracking-widest text-brand-gray">
-            {categories.map((cat) => (
-              <Link 
-                key={cat.name} 
-                to={cat.path} 
-                className={cn(
-                  "hover:text-brand-primary transition-all relative group py-2",
-                  cat.highlight && "text-brand-primary font-black"
-                )}
-              >
-                {cat.name}
-                <span className="absolute bottom-0 left-0 w-0 h-0.5 bg-brand-primary transition-all group-hover:w-full"></span>
-              </Link>
-            ))}
-          </nav>
-
-          {/* Actions */}
-          <div className="flex items-center gap-4 sm:gap-6 relative z-10">
-            <button className="text-brand-gray hover:text-brand-primary transition-colors hidden sm:block">
-              <Search className="w-5 h-5" />
-            </button>
+        <Link to="/" className="text-xl md:text-2xl font-bold italic tracking-tighter order-first md:order-none">
+          <img src="/imagens/logo-gat-purple.png" alt="USE.GAT" className="h-8 md:h-10" />
+        </Link>
+        
+        <div className="flex-1 flex justify-end items-center gap-2 md:gap-4 text-[9px] md:text-[10px] font-bold text-gray-700 uppercase tracking-widest">
+          <div className="relative group cursor-pointer flex items-center gap-1 md:gap-2">
+            <MessageCircle className="w-4 h-4 text-[#6b5b50]" />
+            <span className="hidden md:inline">Central de Atendimento</span> <ChevronDown className="w-3 h-3" />
             
-            <Link to={user ? "/perfil" : "/entrar"} className="text-brand-gray hover:text-brand-primary transition-colors">
-              <UserIcon className="w-5 h-5" />
-            </Link>
-
-            <button 
-              onClick={() => setIsSidebarOpen(true)}
-              className="relative text-brand-gray hover:text-brand-primary transition-all group"
-            >
-              <ShoppingCart className="w-5 h-5" />
-              {cartCount > 0 && (
-                <span className="absolute -top-2 -right-2 bg-brand-primary text-white text-[9px] font-black w-4 h-4 flex items-center justify-center rounded-full shadow-md">
-                  {cartCount}
-                </span>
-              )}
-            </button>
-
-            <button 
-              className="lg:hidden text-brand-gray"
-              onClick={() => setIsMenuOpen(!isMenuOpen)}
-            >
-              <Menu className="w-6 h-6" />
-            </button>
+            <div className="absolute top-full right-0 pt-2 p-5 bg-white border border-gray-100 shadow-2xl rounded-lg w-64 hidden group-hover:block z-50 text-[11px] font-normal normal-case">
+              <p className="font-bold border-b pb-2 mb-3">Fale com a gente</p>
+              <p className="flex items-center gap-2 mb-2 font-bold">(21) 966539999</p>
+              <p className="flex items-center gap-2 mb-2 text-gray-600"><Mail className="w-4 h-4" /> meupedido@aquitemcaneca.com</p>
+              <p className="flex items-center gap-2 text-gray-600"><Clock className="w-4 h-4" /> Seg a sex, das 8:30 às 17:00</p>
+            </div>
           </div>
+
+          <div className="relative group cursor-pointer flex items-center gap-1 md:gap-2">
+            <UserIcon className="w-4 h-4 text-[#6b5b50]" />
+            <span className="hidden md:inline">{user ? 'Minha Conta' : 'Cadastrar'}</span> <ChevronDown className="w-3 h-3" />
+            
+            <div className="absolute top-full right-0 pt-2 py-4 bg-white border border-gray-100 shadow-2xl rounded-lg w-48 hidden group-hover:block z-50 text-[11px] font-normal normal-case space-y-3 px-4">
+              {user ? (
+                <>
+                  <Link to="/perfil" className="block hover:text-[#6b5b50]">Minha Conta</Link>
+                  <Link to="/pedidos" className="block hover:text-[#6b5b50]">Meus Pedidos</Link>
+                  <Link to="/amei" className="block hover:text-[#6b5b50]">Amei</Link>
+                  <Link to="/pedidos" className="block hover:text-[#6b5b50]">Rastrear Pedido</Link>
+                </>
+              ) : (
+                <>
+                  <Link to="/entrar" className="block hover:text-[#6b5b50]">Entrar</Link>
+                  <Link to="/entrar" className="block hover:text-[#6b5b50]">Cadastrar</Link>
+                </>
+              )}
+            </div>
+          </div>
+
+          <button onClick={() => setIsSidebarOpen(true)} className="flex items-center gap-2">
+            <ShoppingCart className="w-4 h-4 text-[#6b5b50]" /> <span className="hidden md:inline">{cartCount}</span>
+          </button>
         </div>
       </div>
 
-      {/* Mobile Menu */}
-      <AnimatePresence>
-        {isMenuOpen && (
-          <>
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              onClick={() => setIsMenuOpen(false)}
-              className="fixed inset-0 bg-brand-black/40 backdrop-blur-sm z-40 lg:hidden"
-            />
-            <motion.div
-              initial={{ x: '-100%' }}
-              animate={{ x: 0 }}
-              exit={{ x: '-100%' }}
-              transition={{ type: 'spring', damping: 25, stiffness: 200 }}
-              className="fixed left-0 top-0 bottom-0 w-80 bg-white z-50 lg:hidden p-8 shadow-2xl flex flex-col"
-            >
-              <div className="flex justify-between items-center mb-10">
-                <span className="text-xl font-serif italic font-bold">Menu</span>
-                <button 
-                  onClick={() => setIsMenuOpen(false)}
-                  className="w-10 h-10 bg-brand-pink-light rounded-full flex items-center justify-center text-brand-pink-strong"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+      <nav className="border-t border-gray-100 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-6 flex items-center gap-6 py-3 text-[10px] font-black text-gray-700 uppercase tracking-widest">
+          <div className="relative group cursor-pointer flex items-center gap-2 py-2 pr-6 border-r border-gray-200">
+            <AlignJustify className="w-4 h-4" />
+            <span>Todas as categorias</span> <ChevronDown className="w-3 h-3" />
 
-              <ul className="space-y-6 flex-grow">
-                {categories.map((cat) => (
-                  <li key={cat.name}>
-                    <Link 
-                      to={cat.path}
-                      onClick={() => setIsMenuOpen(false)}
-                      className={cn(
-                        "text-lg font-medium tracking-tight block hover:text-brand-pink-strong transition-colors",
-                        cat.highlight && "text-brand-pink-strong font-black"
-                      )}
-                    >
-                      {cat.name}
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-
-              <div className="mt-auto pt-8 border-t border-brand-pink-light space-y-4">
-                <Link to="https://instagram.com" target="_blank" className="flex items-center gap-3 text-brand-gray">
-                  <Instagram className="w-5 h-5" />
-                  <span className="text-xs font-bold uppercase tracking-widest">Siga no Instagram</span>
-                </Link>
-              </div>
-            </motion.div>
-          </>
-        )}
-      </AnimatePresence>
+            <div className="absolute top-full left-0 mt-0 bg-white border border-gray-100 shadow-xl w-screen md:w-[600px] hidden group-hover:flex z-50 py-4 font-normal normal-case tracking-normal flex-col md:flex-row">
+                <div className="w-full md:w-1/3 border-b md:border-r border-gray-100">
+                    {menuCategories.map(cat => (
+                        <div key={cat.name} className="px-4 py-3 hover:bg-gray-100 cursor-pointer flex justify-between items-center text-sm md:text-xs">
+                            {cat.name} <span className="md:hidden text-gray-400 font-bold">&gt;</span>
+                        </div>
+                    ))}
+                </div>
+                <div className="w-full md:w-2/3 p-4">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {menuCategories[0].subs.map(sub => (
+                            <div key={sub} className="text-sm text-gray-600 hover:text-black hover:font-bold cursor-pointer">{sub}</div>
+                        ))}
+                    </div>
+                </div>
+            </div>
+          </div>
+          
+          {menuCategories.map(cat => (
+            <Link key={cat.name} to="#" className="hidden md:block hover:text-gray-900 py-2">{cat.name}</Link>
+          ))}
+        </div>
+      </nav>
     </header>
   );
 }

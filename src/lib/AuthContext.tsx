@@ -9,7 +9,8 @@ import {
   signOut,
   createUserWithEmailAndPassword,
   signInWithEmailAndPassword,
-  updateProfile
+  updateProfile,
+  sendPasswordResetEmail
 } from 'firebase/auth';
 import { auth, db } from './firebase';
 import { doc, getDoc, setDoc, serverTimestamp, onSnapshot } from 'firebase/firestore';
@@ -38,6 +39,7 @@ interface AuthContextType {
   signInWithGoogle: () => Promise<void>;
   signUpEmail: (email: string, pass: string, name: string) => Promise<void>;
   signInEmail: (email: string, pass: string) => Promise<void>;
+  sendPasswordReset: (email: string) => Promise<void>;
   signOut: () => Promise<void>;
   updateUserData: (data: Partial<UserData>) => Promise<void>;
 }
@@ -204,10 +206,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await createUserWithEmailAndPassword(auth, email, pass);
       await updateProfile(res.user, { displayName: name });
-      // The onSnapshot in our useEffect will handle creating the Firestore document
-      // using the updated displayName.
+      
+      // Explicitly secure & write the database document with correct name immediately
+      const userRef = doc(db, 'users', res.user.uid);
+      const isBootstrapAdmin = email.trim().toLowerCase() === 'jonassantosclaro@gmail.com' || email.trim().toLowerCase() === 'usegat@x.com';
+      const role = isBootstrapAdmin ? 'admin' : 'customer';
+      const profile = {
+        uid: res.user.uid,
+        name: name,
+        email: email,
+        photoURL: null,
+        createdAt: serverTimestamp(),
+        lastLogin: serverTimestamp(),
+        role: role
+      };
+      
+      try {
+        await setDoc(userRef, profile);
+      } catch (dbErr) {
+        console.error("Failed to create user document synchronously during signUp:", dbErr);
+        handleFirestoreError(dbErr, OperationType.CREATE, `users/${res.user.uid}`);
+      }
     } catch (error: any) {
       console.error("SignUp error:", error);
+      throw error;
+    }
+  };
+
+  const sendPasswordReset = async (email: string) => {
+    try {
+      await sendPasswordResetEmail(auth, email);
+    } catch (error: any) {
+      console.error("Password reset error:", error);
       throw error;
     }
   };
@@ -254,6 +284,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       signInWithGoogle, 
       signUpEmail,
       signInEmail,
+      sendPasswordReset,
       signOut: signOutUser,
       updateUserData
     }}>

@@ -1,6 +1,6 @@
 import { useParams, useNavigate } from 'react-router-dom';
 import React, { useEffect, useState } from 'react';
-import { doc, onSnapshot } from 'firebase/firestore';
+import { doc, onSnapshot, collection } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { useCart } from '@/src/lib/CartContext';
 import axios from 'axios';
@@ -8,15 +8,16 @@ import { formatPrice, cn } from '@/src/lib/utils';
 import { 
   ShoppingBag, 
   ChevronLeft, 
-  ShieldCheck, 
   Truck, 
-  RotateCcw, 
   Plus, 
   Minus, 
   Check, 
   Upload, 
   Image as ImageIcon, 
-  AlertCircle 
+  AlertCircle,
+  CreditCard,
+  QrCode,
+  X
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { FALLBACK_PRODUCTS, Product } from '@/src/lib/productsData';
@@ -112,24 +113,69 @@ export default function ProductDetails() {
 
   // Text inputs
   const [customName, setCustomName] = useState('');
+  const [customSurname, setCustomSurname] = useState('');
   const [customPhrase, setCustomPhrase] = useState('');
   const [selectedFont, setSelectedFont] = useState('Quicksand');
   
   const availableFonts = [
     { name: 'Quicksand', family: 'Quicksand' },
-    { name: 'Hello Valentica', family: 'Hello Valentica' },
+    { name: 'Hello Valentina', family: 'Hello Valentina' },
     { name: 'Cream Cake', family: 'Cream Cake' },
     { name: 'Billion Miracles', family: 'Billion Miracles' }
   ];
 
   // General error checklist
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [isPaymentModalOpen, setIsPaymentModalOpen] = useState(false);
+  const [selectedPayment, setSelectedPayment] = useState<{
+    method: 'pix' | 'cartao';
+    installments: number;
+    text: string;
+    price: number;
+  } | null>(null);
 
   // CEP Shipping Calculator
   const [cep, setCep] = useState('');
   const [shippingLoading, setShippingLoading] = useState(false);
   const [shippingResult, setShippingResult] = useState<{ cost: number; address: any } | null>(null);
   const [shippingError, setShippingError] = useState('');
+
+  // Image Magnifier zoom lenses (lupa) state with HTML cloning
+  const [magnifier, setMagnifier] = useState<{
+    show: boolean;
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  }>({ show: false, x: 0, y: 0, width: 0, height: 0 });
+
+  // Dynamic product variations loaded from Firestore in real-time
+  const [variationsList, setVariationsList] = useState<any[]>([]);
+  const [selectedVariations, setSelectedVariations] = useState<Record<string, string>>({});
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - left;
+    const y = e.clientY - top;
+    
+    // If the cursor is slightly outside, hide the magnifier lens
+    if (x < 0 || y < 0 || x > width || y > height) {
+      setMagnifier(prev => ({ ...prev, show: false }));
+      return;
+    }
+
+    setMagnifier({
+      show: true,
+      x,
+      y,
+      width,
+      height
+    });
+  };
+
+  const handleMouseLeave = () => {
+    setMagnifier(prev => ({ ...prev, show: false }));
+  };
 
   const handleCalculateShipping = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -227,6 +273,46 @@ export default function ProductDetails() {
     return () => unsubscribe();
   }, [id]);
 
+  useEffect(() => {
+    if (!product) return;
+    const variationsRef = collection(db, 'variations');
+    const unsubscribe = onSnapshot(variationsRef, (snapshot) => {
+      const allVars = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }) as any);
+      // Filter variations where categoryId is empty/undefined or matches product category
+      const filtered = allVars.filter((v: any) => !v.categoryId || v.categoryId === product.category) as any[];
+      setVariationsList(filtered);
+      
+      // Select default option for each loaded variation in state
+      setSelectedVariations(prev => {
+        const next = { ...prev };
+        for (const v of filtered) {
+          if (!next[v.name] && v.options && v.options.length > 0) {
+            next[v.name] = v.options[0];
+          }
+        }
+        return next;
+      });
+    }, (error) => {
+      console.warn("Variations snapshot failed/offline, using local static values in ProductDetails:", error);
+    });
+    return () => unsubscribe();
+  }, [product]);
+
+  const getSelectedVariationsSurcharge = () => {
+    let extra = 0;
+    for (const [vName, vVal] of Object.entries(selectedVariations)) {
+      const valStr = vVal as string;
+      const match = valStr.match(/\(\+\s*R\$\s*([\d,.]+)\)/i);
+      if (match) {
+        const valueNum = parseFloat(match[1].replace(',', '.'));
+        if (!isNaN(valueNum)) {
+          extra += valueNum;
+        }
+      }
+    }
+    return extra;
+  };
+
   const toggleItem = (item: string, state: string[], setter: React.Dispatch<React.SetStateAction<string[]>>) => {
     if (state.includes(item)) {
       setter(state.filter(x => x !== item));
@@ -248,7 +334,8 @@ export default function ProductDetails() {
 
   // Caricatura adds R$ 35,00 extra per caricatura person
   const caricaturaPriceExtra = hasCaricatura ? caricaturasQtd * 35.00 : 0;
-  const productFinalPrice = product ? product.price + caricaturaPriceExtra : 0;
+  const variationsPriceExtra = getSelectedVariationsSurcharge();
+  const productFinalPrice = product ? product.price + caricaturaPriceExtra + variationsPriceExtra : 0;
 
   const handleAddToCart = () => {
     // Perform validations
@@ -274,6 +361,13 @@ export default function ProductDetails() {
       if (selectedDiversos.length < 2 || selectedDiversos.length > 5) errors.push("Selecione de 2 a 5 diversos.");
       if (selectedDiversos.includes("Outros") && !diversosOutros.trim()) errors.push("Por favor, especifique qual outro item diverso você gostaria de incluir.");
       if (hasCaricatura && !caricaturaFile) errors.push("Por favor, faça o upload de pelo menos uma foto para a caricatura.");
+    } else if (product?.customizable) {
+      if (product.hasNameAndSurname || product.hasNameAndSurnameSemAoVivo) {
+        if (!customName.trim()) errors.push("Por favor, preencha o campo de Nome.");
+        if (!customSurname.trim()) errors.push("Por favor, preencha o campo de Sobrenome.");
+      } else {
+        if (!customName.trim()) errors.push("Por favor, preencha o campo de Nome Completo.");
+      }
     }
 
     if (errors.length > 0) {
@@ -328,17 +422,32 @@ export default function ProductDetails() {
       customization = {
         tipo: product.category === 'canecas' ? 'caneca' : 'custom',
         nome: customName,
+        sobrenome: (product.hasNameAndSurname || product.hasNameAndSurnameSemAoVivo) ? customSurname : '',
         frase: customPhrase,
         fonte: selectedFont,
         foto: caricaturaFile
       };
     }
 
+    if (Object.keys(selectedVariations).length > 0) {
+      if (!customization) {
+        customization = { tipo: 'padrao' };
+      }
+      customization.variations = selectedVariations;
+    }
+
+    if (selectedPayment) {
+      if (!customization) {
+        customization = { tipo: 'padrao' };
+      }
+      customization.formaPagamento = selectedPayment.text;
+    }
+
     addItem({
       id: product!.id,
       sku: product!.sku,
       name: product!.name,
-      price: productFinalPrice,
+      price: selectedPayment ? selectedPayment.price : productFinalPrice,
       imageUrl: product!.imageUrl,
       quantity,
       customization
@@ -367,12 +476,106 @@ export default function ProductDetails() {
             animate={{ opacity: 1, scale: 1 }}
             className="bg-white/40 backdrop-blur-md rounded-[50px] p-12 aspect-square flex items-center justify-center shadow-sm border border-brand-pink-medium/30 relative overflow-hidden val-preview-box"
           >
-            <div className="relative w-full h-full flex items-center justify-center garrafa-preview">
+            <div 
+              onMouseMove={handleMouseMove}
+              onMouseLeave={handleMouseLeave}
+              className="relative w-full h-full flex items-center justify-center garrafa-preview cursor-zoom-in group/preview"
+            >
               <img 
                 src={product.imageUrl || "/imagens/mugs-boho.jpg"} 
                 alt={product.name}
-                className="w-full h-full object-contain relative z-10 transition-transform duration-500 hover:scale-105"
+                className="w-full h-full object-contain relative z-10 select-none transition-all duration-300 group-hover/preview:opacity-90"
               />
+              
+              {/* Lupa / Magnifier Lens Element with Live Cloned HTML Layout */}
+              {magnifier.show && (
+                <div 
+                  style={{
+                    position: 'absolute',
+                    left: `${magnifier.x - 70}px`,
+                    top: `${magnifier.y - 70}px`,
+                    width: '140px',
+                    height: '140px',
+                    borderRadius: '50%',
+                    border: '4px solid #4D1D54',
+                    boxShadow: '0 8px 30px rgba(0,0,0,0.3), inset 0 0 10px rgba(0,0,0,0.15)',
+                    overflow: 'hidden',
+                    pointerEvents: 'none',
+                    zIndex: 100,
+                    backgroundColor: 'white',
+                  }}
+                  className="pointer-events-none absolute"
+                >
+                  <div
+                    style={{
+                      position: 'absolute',
+                      width: `${magnifier.width}px`,
+                      height: `${magnifier.height}px`,
+                      transformOrigin: '0 0',
+                      transform: `translate(${70 - magnifier.x * 2.2}px, ${70 - magnifier.y * 2.2}px) scale(2.2)`,
+                      pointerEvents: 'none',
+                    }}
+                    className="flex items-center justify-center select-none"
+                  >
+                    <img 
+                      src={product.imageUrl || "/imagens/mugs-boho.jpg"} 
+                      alt={product.name}
+                      className="w-full h-full object-contain relative z-10 select-none"
+                    />
+                    
+                    {product.customizable && (
+                      <div className="absolute inset-0 z-20 flex items-center justify-center pointer-events-none select-none">
+                        <div className={cn(
+                          "flex flex-col justify-center items-center text-center px-1 overflow-hidden",
+                          product.category === 'canecas' 
+                            ? "w-[30%] h-[25%] mt-[3%] mr-[10%]" 
+                            : "w-[23%] h-[30%] mt-[22%]"
+                        )}>
+                          <div className="texto-preview select-none overflow-hidden text-ellipsis flex flex-col items-center justify-center w-full">
+                            <span 
+                              className={cn(
+                                "text-center break-all leading-tight transition-all",
+                                selectedFont === 'Quicksand'
+                                  ? (customName.trim() ? "text-[#3D1A45]/85 font-black uppercase tracking-widest" : "text-[#4D1D54]/25 font-medium italic")
+                                  : (customName.trim() ? "text-[#3D1A45]/95 font-medium" : "text-[#4D1D54]/25 font-medium italic")
+                              )}
+                              style={{ 
+                                fontSize: calculateFontSize(customName.trim() || 'Seu Nome', product.category),
+                                fontFamily: selectedFont === 'Quicksand' 
+                                  ? '"Quicksand", sans-serif' 
+                                  : `"${selectedFont}", "Quicksand", sans-serif`,
+                                textShadow: customName.trim() 
+                                  ? '1px 1px 1px rgba(255,255,255,0.7), -0.5px -0.5px 0px rgba(0,0,0,0.15)' 
+                                  : 'none',
+                                letterSpacing: selectedFont === 'Quicksand' ? '0.12em' : 'normal',
+                                textTransform: selectedFont === 'Quicksand' ? 'uppercase' : 'none',
+                                display: 'block',
+                                width: '100%'
+                              }}
+                            >
+                              {customName.trim() ? customName.trim() : 'Seu Nome'}
+                            </span>
+                            
+                            {customPhrase.trim() && (
+                              <span 
+                                className="text-[#4D1D54]/65 font-medium italic mt-2 block w-[85%] break-words leading-tight"
+                                style={{ 
+                                  fontSize: '0.625rem',
+                                  letterSpacing: '0.05em',
+                                  fontFamily: '"Playfair Display", serif',
+                                  textShadow: '0.5px 0.5px 0px rgba(255,255,255,0.5)'
+                                }}
+                              >
+                                {customPhrase}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
               
               {/* Overlaid preview tag */}
               {product.customizable && (
@@ -465,19 +668,7 @@ export default function ProductDetails() {
               </div>
             )}
 
-            {/* Standard Trust Badges */}
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-brand-pink-medium/30">
-              {[
-                { icon: Truck, text: "Correios c/ Código" },
-                { icon: ShieldCheck, text: "Gravação à Laser eterna" },
-                { icon: RotateCcw, text: "Troca s/ Burocracia" }
-              ].map((badge, idx) => (
-                <div key={idx} className="flex flex-col items-center text-center p-3 opacity-85">
-                  <badge.icon className="w-6 h-6 mb-2 text-brand-gold" />
-                  <span className="text-[8px] font-black uppercase tracking-widest text-brand-gray leading-none">{badge.text}</span>
-                </div>
-              ))}
-            </div>
+
           </div>
         </div>
 
@@ -501,16 +692,40 @@ export default function ProductDetails() {
             <p className="text-[10px] font-black uppercase tracking-wide text-[#8C6A3B]">
               Em até 3x de {formatPrice(productFinalPrice / 3)} sem juros no cartão
             </p>
-            {product?.stock !== undefined && (
-              <div className="pt-2 text-xs font-bold uppercase tracking-widest flex items-center gap-1.5">
-                {product.stock === 0 ? (
-                  <span className="text-red-500 bg-red-50 border border-red-200 px-3 py-1.5 rounded-full text-[10px] font-black leading-none flex items-center gap-1">❌ Fora de Estoque (Esgotado)</span>
-                ) : product.stock <= 5 ? (
-                  <span className="text-amber-600 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full text-[10px] font-black leading-none flex items-center gap-1">⚠️ Apenas {product.stock} unidades em estoque!</span>
-                ) : (
-                  <span className="text-green-600 bg-green-50 border border-green-200 px-3 py-1.5 rounded-full text-[10px] font-black leading-none flex items-center gap-1">✓ Em Estoque ({product.stock} disponíveis)</span>
-                )}
-              </div>
+            <button
+              type="button"
+              id="btn-mais-formas-pagamento"
+              onClick={() => setIsPaymentModalOpen(true)}
+              className="text-[11px] font-black uppercase tracking-wider text-brand-primary hover:text-brand-primary-light transition-all flex items-center gap-1.5 underline decoration-2 decoration-brand-pink-medium cursor-pointer"
+            >
+              <CreditCard className="w-4 h-4 text-brand-gold" />
+              Mais formas de pagamento
+            </button>
+
+            {selectedPayment && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                className="mt-4 bg-green-50 border border-green-200 p-4 rounded-2xl flex items-center justify-between shadow-sm gap-3"
+              >
+                <div className="flex items-center gap-2.5">
+                  <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center text-green-700 shrink-0">
+                    <Check className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <span className="text-[10px] font-black uppercase tracking-widest text-green-700 block select-none">Opção de Pagamento Selecionada</span>
+                    <p className="text-xs font-black text-brand-black">{selectedPayment.text}</p>
+                    <span className="text-[9px] text-gray-500 block">Total atualizado no carrinho: {formatPrice(selectedPayment.price)}</span>
+                  </div>
+                </div>
+                <button 
+                  type="button" 
+                  onClick={() => setIsPaymentModalOpen(true)} 
+                  className="text-gray-400 hover:text-red-500 transition-colors text-xs font-bold underline cursor-pointer"
+                >
+                  Alterar
+                </button>
+              </motion.div>
             )}
           </div>
 
@@ -684,7 +899,7 @@ export default function ProductDetails() {
                     />
                     <div className="space-y-2 mt-2">
                       <AnimatePresence>
-                        {selectedComidas.filter(x => x !== 'Outros').map((item) => (
+                        {selectedComidas.filter(x => x !== 'Outros' && (x === 'Legumes Favoritos' || x === 'Frutas Favoritas')).map((item) => (
                           <motion.div
                             key={item}
                             initial={{ opacity: 0, height: 0 }}
@@ -733,7 +948,7 @@ export default function ProductDetails() {
                     />
                     <div className="space-y-2 mt-2">
                       <AnimatePresence>
-                        {selectedBebidas.filter(x => x !== 'Outros').map((item) => (
+                        {selectedBebidas.filter(x => x !== 'Outros' && false).map((item) => (
                           <motion.div
                             key={item}
                             initial={{ opacity: 0, height: 0 }}
@@ -782,7 +997,7 @@ export default function ProductDetails() {
                     />
                     <div className="space-y-2 mt-2">
                       <AnimatePresence>
-                        {selectedEntretenimento.filter(x => x !== 'Outros').map((item) => (
+                        {selectedEntretenimento.filter(x => x !== 'Outros' && false).map((item) => (
                           <motion.div
                             key={item}
                             initial={{ opacity: 0, height: 0 }}
@@ -831,7 +1046,7 @@ export default function ProductDetails() {
                     />
                     <div className="space-y-2 mt-2">
                       <AnimatePresence>
-                        {selectedLazer.filter(x => x !== 'Outros').map((item) => (
+                        {selectedLazer.filter(x => x !== 'Outros' && false).map((item) => (
                           <motion.div
                             key={item}
                             initial={{ opacity: 0, height: 0 }}
@@ -880,7 +1095,7 @@ export default function ProductDetails() {
                     />
                     <div className="space-y-2 mt-2">
                       <AnimatePresence>
-                        {selectedMomentos.filter(x => x !== 'Outros').map((item) => (
+                        {selectedMomentos.filter(x => x !== 'Outros' && (x === 'Data do Casamento' || x === 'Data do Aniversário' || x === 'Filhos' || x === 'Nome Especial')).map((item) => (
                           <motion.div
                             key={item}
                             initial={{ opacity: 0, height: 0 }}
@@ -929,7 +1144,7 @@ export default function ProductDetails() {
                     />
                     <div className="space-y-2 mt-2">
                       <AnimatePresence>
-                        {selectedDiversos.filter(x => x !== 'Outros').map((item) => (
+                        {selectedDiversos.filter(x => x !== 'Outros' && (x === 'Profissão' || x === 'Time de Futebol' || x === 'Religião' || x === 'Animais de Estimação')).map((item) => (
                           <motion.div
                             key={item}
                             initial={{ opacity: 0, height: 0 }}
@@ -967,102 +1182,47 @@ export default function ProductDetails() {
                   </div>
                 </div>
               )}
-
-              {/* CARICATURA MODULE (Charges Extra fee) */}
-              <div className="space-y-6 pt-6 border-t border-brand-gold/10">
-                <div className="flex justify-between items-center">
-                  <div className="space-y-1">
-                    <span className="text-xs font-black uppercase tracking-wider text-brand-black block">👩‍🎨 Adicionar Caricatura Ilustrada?</span>
-                    <span className="text-[10px] text-gray-500 block font-medium">Acresce R$ 35,00 por personagem na composição</span>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setHasCaricatura(!hasCaricatura)}
-                    className={`w-14 h-8 rounded-full transition-all relative ${hasCaricatura ? 'bg-[#4D1D54]' : 'bg-gray-200'}`}
-                  >
-                    <div className={`w-6 h-6 rounded-full bg-white absolute top-1 transition-all ${hasCaricatura ? 'right-1' : 'left-1'} shadow`} />
-                  </button>
-                </div>
-
-                {hasCaricatura && (
-                  <motion.div 
-                    initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: 'auto', opacity: 1 }}
-                    className="space-y-4 pt-2 bg-white/60 p-5 rounded-2xl border border-[#B48A4E]/20"
-                  >
-                    <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-bold text-gray-600 uppercase tracking-widest">Quantidade de Personagens (1 a 3)</span>
-                      <div className="flex items-center gap-3">
-                        <button 
-                          type="button"
-                          onClick={() => setCaricaturasQtd(Math.max(1, caricaturasQtd - 1))}
-                          className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center font-bold text-sm bg-white"
-                        >
-                          -
-                        </button>
-                        <span className="font-bold text-sm">{caricaturasQtd}</span>
-                        <button 
-                          type="button"
-                          onClick={() => setCaricaturasQtd(Math.min(3, caricaturasQtd + 1))}
-                          className="w-8 h-8 rounded-full border border-gray-300 flex items-center justify-center font-bold text-sm bg-white"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 pt-2">
-                      <button
-                        type="button"
-                        onClick={() => setCaricaturaEstilo('colorido')}
-                        className={`py-2 px-4 rounded-xl text-center text-[10px] font-bold border transition-all ${
-                          caricaturaEstilo === 'colorido' ? 'bg-[#4D1D54] text-white' : 'bg-white text-gray-600'
-                        }`}
-                      >
-                        Caricatura Colorida
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setCaricaturaEstilo('preto')}
-                        className={`py-2 px-4 rounded-xl text-center text-[10px] font-bold border transition-all ${
-                          caricaturaEstilo === 'preto' ? 'bg-[#4D1D54] text-white' : 'bg-white text-gray-600'
-                        }`}
-                      >
-                        Caricatura Contornos (B&W)
-                      </button>
-                    </div>
-
-                    {/* Image files upload */}
-                    <div className="pt-2">
-                      <label className="text-[9px] font-black uppercase tracking-widest text-[#8C6A3B] block mb-2">Selecione uma foto nítida de rosto</label>
-                      <div className="relative border-2 border-dashed border-gray-200 rounded-xl p-4 flex flex-col items-center justify-center text-center bg-white cursor-pointer hover:border-[#4D1D54]">
-                        <input 
-                          type="file" 
-                          accept="image/*" 
-                          onChange={handleFileUpload} 
-                          className="absolute inset-0 opacity-0 cursor-pointer w-full"
-                        />
-                        <Upload className="w-6 h-6 text-gray-400 mb-1" />
-                        <span className="text-[10px] text-gray-500 font-bold uppercase tracking-wider">
-                          {caricaturaFile ? "Deseja substituir foto?" : "Carregar Foto de Origem"}
-                        </span>
-                      </div>
-                      
-                      {caricaturaFile && (
-                        <div className="mt-3 flex items-center gap-3 bg-[#FAF7F8] p-2 rounded border border-[#B48A4E]/10">
-                          <img src={caricaturaFile} className="w-12 h-12 rounded object-cover border border-stone-200" />
-                          <div className="flex-grow">
-                            <span className="text-[9px] font-black text-green-600 block uppercase">FOTO ANEXADA COM SUCESSO</span>
-                            <span className="text-[9px] text-brand-gray block">A caricatura será baseada neste rosto</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </motion.div>
-                )}
-              </div>
             </div>
           ) : null}
+
+          {/* Dynamic Product Variations Section */}
+          {variationsList.length > 0 && (
+            <div className="bg-[#FAF7F8]/80 backdrop-blur-sm p-6 rounded-[2rem] border border-brand-pink-medium/20 space-y-6">
+              <h4 className="text-xs font-black text-brand-primary uppercase tracking-widest border-b border-brand-pink-medium/10 pb-2">📂 Opções Disponíveis</h4>
+              <div className="space-y-4">
+                {variationsList.map((variation) => (
+                  <div key={variation.id} className="space-y-2">
+                    <label className="text-[10px] font-black uppercase tracking-widest text-[#8C6A3B] block">
+                      {variation.name}
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {(variation.options || []).map((option: string) => {
+                        const isSelected = selectedVariations[variation.name] === option;
+                        return (
+                          <button
+                            key={option}
+                            type="button"
+                            onClick={() => setSelectedVariations(prev => ({
+                              ...prev,
+                              [variation.name]: option
+                            }))}
+                            className={cn(
+                              "px-4 py-2 rounded-xl text-xs font-bold transition-all border cursor-pointer",
+                              isSelected
+                                ? "bg-[#4D1D54] text-white border-[#4D1D54] shadow-md scale-[1.02]"
+                                : "bg-white text-gray-700 border-gray-200 hover:border-[#4D1D54]/30"
+                            )}
+                          >
+                            {option}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Core buying container - Quantities and Add to Cart */}
           <div className="space-y-6 pt-6">
@@ -1285,6 +1445,177 @@ export default function ProductDetails() {
           </div>
         </div>
       </div>
+
+      {/* 5. Payment Methods Modal */}
+      <AnimatePresence>
+        {isPaymentModalOpen && (
+          <div className="fixed inset-0 z-[350] flex items-center justify-center p-4">
+            {/* Backdrop wrapper */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setIsPaymentModalOpen(false)}
+              className="absolute inset-0 bg-neutral-900/60 backdrop-blur-sm"
+            />
+
+            {/* Modal Body */}
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              transition={{ type: "spring", duration: 0.5 }}
+              className="relative w-full max-w-lg bg-[#FAF7F8] rounded-[32px] shadow-[0_25px_60px_rgba(0,0,0,0.15)] border border-[#B48A4E]/20 overflow-hidden flex flex-col max-h-[85vh] z-10"
+            >
+              {/* Header */}
+              <div className="bg-[#4D1D54] p-6 text-white flex items-center justify-between">
+                <div className="flex items-center gap-2.5">
+                  <CreditCard className="w-5 h-5 text-brand-gold" />
+                  <div>
+                    <h3 className="font-serif font-black text-lg tracking-wide">Formas de Pagamento</h3>
+                    <p className="text-[10px] text-brand-pink-light/85 font-mono uppercase tracking-widest">{product.name}</p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsPaymentModalOpen(false)}
+                  className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center text-white hover:bg-white/20 transition-all cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Content Panel */}
+              <div className="p-6 overflow-y-auto space-y-6">
+                
+                {/* Pix Highlight banner (Selectable Button) */}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedPayment({
+                      method: 'pix',
+                      installments: 1,
+                      text: `Pix à Vista (10% de Desconto)`,
+                      price: productFinalPrice * 0.90
+                    });
+                    setIsPaymentModalOpen(false);
+                  }}
+                  className={cn(
+                    "w-full text-left bg-gradient-to-r from-[#FAF5EF] to-white border-2 p-5 rounded-2xl relative overflow-hidden transition-all hover:shadow-md cursor-pointer block",
+                    selectedPayment?.method === 'pix'
+                      ? "border-green-600 ring-2 ring-green-600/30"
+                      : "border-[#B48A4E]/30"
+                  )}
+                >
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-[#B48A4E]/10 rounded-xl flex items-center justify-center text-[#8C6A3B] shrink-0 border border-[#B48A4E]/20">
+                      <QrCode className="w-6 h-6" />
+                    </div>
+                    <div className="flex-grow space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black uppercase tracking-wider text-[#FAF7F8] bg-[#B48A4E] px-2 py-0.5 rounded-full font-mono">
+                          10% de DESCONTO
+                        </span>
+                        {selectedPayment?.method === 'pix' && (
+                          <span className="text-[9px] font-black uppercase bg-green-600 text-white px-2 py-0.5 rounded-full select-none">
+                            Selecionado
+                          </span>
+                        )}
+                      </div>
+                      <h4 className="font-serif font-black text-lg text-brand-black">Pagar via PIX</h4>
+                      <p className="text-2xl font-serif font-black text-[#8C6A3B]">
+                        {formatPrice(productFinalPrice * 0.90)}
+                      </p>
+                      <p className="text-[10px] text-gray-500 font-medium">
+                        Aprovação instantânea e seu pedido já vai direto para o setor de produção e design.
+                      </p>
+                    </div>
+                  </div>
+                </button>
+
+                {/* Credit Card installment breakdown */}
+                <div className="space-y-3">
+                  <h5 className="text-[10px] font-black uppercase tracking-widest text-[#4D1D54] border-b border-brand-pink-medium/20 pb-2">
+                    💳 Parcelamento no Cartão de Crédito
+                  </h5>
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-xs font-bold font-sans">
+                    {/* Render standard 12 installments as individual checkout selectors */}
+                    {Array.from({ length: 12 }, (_, i) => {
+                      const num = i + 1;
+                      const isNoInterest = num <= 3;
+                      let installmentPrice = productFinalPrice / num;
+                      
+                      // if over 3 interest free, apply standard credit card slight compound interest rate
+                      if (!isNoInterest) {
+                        const interestRate = 1 + (num * 0.015);
+                        installmentPrice = (productFinalPrice * interestRate) / num;
+                      }
+
+                      const isSelected = selectedPayment?.method === 'cartao' && selectedPayment?.installments === num;
+
+                      return (
+                        <button
+                          type="button"
+                          key={num}
+                          onClick={() => {
+                            setSelectedPayment({
+                              method: 'cartao',
+                              installments: num,
+                              text: `${num}x de ${formatPrice(installmentPrice)} ${isNoInterest ? 'sem juros' : 'no cartão'} (${formatPrice(installmentPrice * num)} total)`,
+                              price: installmentPrice * num
+                            });
+                            setIsPaymentModalOpen(false);
+                          }}
+                          className={cn(
+                            "flex items-center justify-between p-3 rounded-xl border transition-all text-left w-full hover:shadow-sm cursor-pointer",
+                            isSelected
+                              ? "bg-white border-green-600 ring-2 ring-green-600/35 text-brand-black shadow-md"
+                              : isNoInterest
+                                ? "bg-white border-brand-pink-medium/30 text-brand-black shadow-none"
+                                : "bg-[#FAF7F8]/50 border-stone-150 text-gray-600"
+                          )}
+                        >
+                          <div className="flex flex-col">
+                            <span className="text-xs font-extrabold">{num}x de</span>
+                            <span className="text-xs text-brand-gray font-mono font-medium">{formatPrice(installmentPrice)}</span>
+                          </div>
+                          <span className={cn(
+                            "text-[8px] font-black uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0",
+                            isSelected
+                              ? "bg-green-600 text-white"
+                              : isNoInterest
+                                ? "bg-green-50 text-green-600 border border-green-100"
+                                : "bg-stone-100 text-stone-500"
+                          )}>
+                            {isSelected ? 'Selecionado ✓' : isNoInterest ? 'Sem Juros' : 'c/ Juros'}
+                          </span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Safe info note */}
+                <div className="bg-stone-50 p-4 rounded-xl border border-stone-200 text-[10px] text-gray-500 font-medium leading-relaxed">
+                  🔒 <strong className="text-brand-black">Compra 100% Protegida:</strong> Utilizamos criptografia SSL de ponta a ponta. Sua compra conta com garantia de entrega total e suporte personalizado por WhatsApp de segunda a sábado.
+                </div>
+
+              </div>
+
+              {/* Footer action */}
+              <div className="bg-white p-5 border-t border-brand-pink-medium/10 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setIsPaymentModalOpen(false)}
+                  className="bg-[#4D1D54] hover:bg-[#6c2877] text-white px-6 py-3 rounded-full text-[10px] font-black uppercase tracking-widest transition-all shadow-md cursor-pointer"
+                >
+                  Fechar janela
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

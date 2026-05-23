@@ -29,6 +29,7 @@ import { formatPrice, cn } from '@/src/lib/utils';
 import { useAuth } from '@/src/lib/AuthContext';
 import { FALLBACK_PRODUCTS, Product } from '@/src/lib/productsData';
 import { useCart } from '@/src/lib/CartContext';
+import FeaturesBanner from '@/src/components/layout/FeaturesBanner';
 
 export default function Home() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -298,7 +299,7 @@ export default function Home() {
         </div>
       </section>
 
-      {/* 2. Newsletter Discount Modal/Box (Cupom Automático no Site) */}
+      <FeaturesBanner />
       <section className="bg-white/50 backdrop-blur-md py-10 border-y border-brand-golden/10 relative z-15">
         <div className="max-w-7xl mx-auto px-6 lg:px-10 flex flex-col md:flex-row items-center justify-between gap-8">
           <div className="flex items-center gap-4">
@@ -879,7 +880,7 @@ export default function Home() {
               return (faqList.length > 0 ? faqList : [
                 { q: "Qual o prazo de envio?", a: "Nosso prazo normal de produção Boho é de 5 a 7 dias úteis antes do despacho." },
                 { q: "A gravação a laser é definitiva?", a: "Sim! A gravação é permanente e resistente, pois remove a pintura revelando o aço cirúrgico." },
-                { q: "Como envio meus dados de personalização?", a: "Diretamente na página de finalização da compra ou após o fechamento via WhatsApp." },
+                { q: "Como envio meus dados de personalização?", a: "Diretamente na página do produto antes de adicionar ao carrinho de forma 100% integrada e segura." },
                 { q: "Posso colocar nome e sobrenome?", a: "Com certeza, adaptamos o tamanho das letras para que fique perfeitamente harmonioso." }
               ]);
             })().map((faq: any, i: number) => (

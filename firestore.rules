@@ -102,5 +102,23 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+
+    // 6. CATEGORIES
+    match /categories/{categoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 7. SUBCATEGORIES
+    match /subcategories/{subcategoryId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    // 8. VARIATIONS
+    match /variations/{variationId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
   }
 }

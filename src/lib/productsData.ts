@@ -10,6 +10,7 @@ export interface Product {
   detailedDescription?: string;
   customizable: boolean;
   isSuaHistoria?: boolean;
+  variations?: { name: string; price: number; stock: number }[];
 }
 
 export const FALLBACK_PRODUCTS: Product[] = [

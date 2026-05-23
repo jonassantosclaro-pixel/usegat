@@ -104,6 +104,44 @@ try {
 }
 app.use('/uploads', express.static(uploadsDir));
 
+// Ensure fonts folder exists and sync fonts
+const fontsDir = path.join(process.cwd(), 'public', 'fonts');
+try {
+  if (!fs.existsSync(fontsDir)) {
+    fs.mkdirSync(fontsDir, { recursive: true });
+  }
+} catch (e) {
+  console.error("Error creating fonts folder:", e);
+}
+
+// Sync font files and download "Quicksand.ttf" if missing
+async function ensureFonts() {
+  try {
+    const quicksandPath = path.join(fontsDir, 'Quicksand.ttf');
+    if (!fs.existsSync(quicksandPath)) {
+      console.log("[Fonts] Quicksand.ttf is missing in public/fonts. Downloading...");
+      const response = await axios.get(
+        "https://github.com/google/fonts/raw/main/ofl/quicksand/static/Quicksand-Regular.ttf",
+        { responseType: 'arraybuffer' }
+      );
+      fs.writeFileSync(quicksandPath, Buffer.from(response.data));
+      console.log("[Fonts] Quicksand.ttf downloaded and saved successfully.");
+    } else {
+      console.log("[Fonts] Quicksand.ttf is already present in public/fonts.");
+    }
+
+    const targetValentina = path.join(fontsDir, 'Hello Valentina.ttf');
+    const sourceValentica = path.join(fontsDir, 'HelloValentica.ttf');
+    if (!fs.existsSync(targetValentina) && fs.existsSync(sourceValentica)) {
+      fs.copyFileSync(sourceValentica, targetValentina);
+      console.log("[Fonts] Copied HelloValentica.ttf to Hello Valentina.ttf for naming compatibility.");
+    }
+  } catch (err) {
+    console.error("[Fonts] Error ensuring fonts are synchronized:", err);
+  }
+}
+ensureFonts();
+
 // 0. Image Upload Endpoint (Converts Base64 compressed image to local file)
 app.post("/api/upload", async (req, res) => {
   try {

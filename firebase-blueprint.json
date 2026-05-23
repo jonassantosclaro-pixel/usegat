@@ -78,6 +78,43 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["code", "type", "value", "active"]
+    },
+    "Category": {
+      "title": "Category",
+      "description": "Category for products",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name"]
+    },
+    "Subcategory": {
+      "title": "Subcategory",
+      "description": "Subcategory belonging to a Category",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "categoryId"]
+    },
+    "Variation": {
+      "title": "Variation",
+      "description": "Customizable product variations with option choices",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "options": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "name", "options"]
     }
   },
   "firestore": {
@@ -100,6 +137,18 @@
     "/coupons": {
       "schema": "Coupon",
       "description": "Store discount coupons"
+    },
+    "/categories": {
+      "schema": "Category",
+      "description": "Collection of product categories"
+    },
+    "/subcategories": {
+      "schema": "Subcategory",
+      "description": "Collection of subcategories"
+    },
+    "/variations": {
+      "schema": "Variation",
+      "description": "Collection of dynamic product variations and option choices"
     }
   }
 }

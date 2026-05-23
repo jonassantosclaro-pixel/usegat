@@ -3,7 +3,15 @@
 
 @font-face {
   font-family: 'Hello Valentica';
-  src: url('/fonts/HelloValentica.ttf') format('truetype');
+  src: url('../public/fonts/HelloValentica.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Hello Valentina';
+  src: url('../public/fonts/HelloValentica.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -11,7 +19,7 @@
 
 @font-face {
   font-family: 'Cream Cake';
-  src: url('/fonts/CreamCake.otf') format('opentype');
+  src: url('../public/fonts/CreamCake.otf') format('opentype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -19,7 +27,15 @@
 
 @font-face {
   font-family: 'Billion Miracles';
-  src: url('/fonts/BillionMiracles.ttf') format('truetype');
+  src: url('../public/fonts/BillionMiracles.ttf') format('truetype');
+  font-weight: normal;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Quicksand';
+  src: url('../public/fonts/Quicksand.ttf') format('truetype');
   font-weight: normal;
   font-style: normal;
   font-display: swap;
@@ -29,6 +45,7 @@
   --font-sans: "Quicksand", ui-sans-serif, system-ui, sans-serif;
   --font-serif: "Playfair Display", serif;
   --font-hello-valentica: "Hello Valentica", sans-serif;
+  --font-hello-valentina: "Hello Valentina", sans-serif;
   --font-cream-cake: "Cream Cake", sans-serif;
   --font-billion-miracles: "Billion Miracles", sans-serif;
   --font-quicksand: "Quicksand", sans-serif;
@@ -93,8 +110,43 @@ body::after {
     100% { transform: translateX(-50%); }
   }
 
-  .animate-scroll {
+  .animate-scroll, .animate-marquee {
     animation: scroll 30s linear infinite;
     display: inline-block;
   }
+}
+
+/* Painel Administrativo - Cores Preto Negrito Forte */
+#admin-panel {
+  --color-brand-gold: #000000 !important;
+  --color-brand-gold-dark: #000000 !important;
+  --color-brand-pink-strong: #000000 !important;
+  --color-brand-primary: #000000 !important;
+  --color-brand-primary-light: #1c1917 !important;
+  --color-brand-pink-medium: #000000 !important;
+}
+
+#admin-panel label, 
+#admin-panel th, 
+#admin-panel dt, 
+#admin-panel .text-brand-gold, 
+#admin-panel .text-[#8C6A3B],
+#admin-panel .text-brand-pink-strong {
+  color: #000000 !important;
+  font-weight: 900 !important;
+}
+
+#admin-panel input, 
+#admin-panel select, 
+#admin-panel textarea {
+  color: #000000 !important;
+  font-weight: 800 !important;
+  border-color: #d6d3d1 !important;
+}
+
+#admin-panel input:focus, 
+#admin-panel select:focus, 
+#admin-panel textarea:focus {
+  border-color: #000000 !important;
+  box-shadow: 0 0 0 2px rgba(0, 0, 0, 0.1) !important;
 }

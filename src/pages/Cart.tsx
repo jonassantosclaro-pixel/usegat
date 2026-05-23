@@ -1,7 +1,7 @@
 import { useCart } from '@/src/lib/CartContext';
 import { useAuth } from '@/src/lib/AuthContext';
 import { formatPrice } from '@/src/lib/utils';
-import { ShoppingBag, X, Trash2, ArrowLeft, Send, CheckSquare, Gift, Heart } from 'lucide-react';
+import { ShoppingBag, X, Trash2, ArrowLeft, CheckSquare, Gift, Heart, CreditCard } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
@@ -102,45 +102,6 @@ export default function Cart() {
     } finally {
       setCouponLoading(false);
     }
-  };
-
-  // Generate WhatsApp buy message with detailed summaries
-  const handleWhatsAppBuy = () => {
-    let text = `*NOVO PEDIDO DE COMPRA - USE GAT*\n----------------------------------------\n\n`;
-    
-    items.forEach((item, idx) => {
-      text += `*${idx + 1}. ${item.name}*\n`;
-      text += `• Quantidade: ${item.quantity}\n`;
-      text += `• Preço Unitário: ${formatPrice(item.price)}\n`;
-      
-      if (item.customization) {
-        text += `   _✨ Customização:_\n`;
-        if (item.customization.nome) text += `   - Nome: ${item.customization.nome}\n`;
-        if (item.customization.frase) text += `   - Frase/Data: ${item.customization.frase}\n`;
-        if (item.customization.fonte) text += `   - Fonte da Letra: ${item.customization.fonte}\n`;
-        if (item.customization.elementsStyle) text += `   - Estilo: ${item.customization.elementsStyle === 'colorido' ? '🎨 Colorido' : '🔲 Contorno Preto'}\n`;
-        if (item.customization.comidas) text += `   - Comidas: ${item.customization.comidas}\n`;
-        if (item.customization.bebidas) text += `   - Bebidas: ${item.customization.bebidas}\n`;
-        if (item.customization.lazer) text += `   - Lazer/Esportes: ${item.customization.lazer}\n`;
-        if (item.customization.momentos) text += `   - Próximos/Momentos: ${item.customization.momentos}\n`;
-        if (item.customization.caricatura) {
-          text += `   - Caricatura: Sim (${item.customization.caricatura.qtd}p, ${item.customization.caricatura.estilo})\n`;
-        }
-      }
-      text += `\n`;
-    });
-
-    text += `----------------------------------------\n`;
-    text += `*Subtotal:* ${formatPrice(subtotal)}\n`;
-    if (progressiveDiscount > 0) text += `*Desconto Progressivo:* -${formatPrice(progressiveDiscount)}\n`;
-    if (discountAmount > 0) text += `*Cupom de Desconto:* -${formatPrice(discountAmount)} (${appliedCoupon?.code})\n`;
-    if (addGiftWrap) text += `*Embalagem Especial:* R$ 9,90 por itens personalizados (${formatPrice(giftWrapTotal)})\n`;
-    text += `*Frete:* ${isFreeShipping ? 'Grátis!' : formatPrice(activeShippingCost)}\n`;
-    text += `*VALOR TOTAL:* ${formatPrice(finalTotal)}\n\n`;
-    text += `Desejo continuar meu pedido rústico-chic do ateliê!`;
-
-    const encodedText = encodeURIComponent(text);
-    window.open(`https://wa.me/5521999999999?text=${encodedText}`, '_blank');
   };
 
   if (items.length === 0 && !showCheckout) {
@@ -272,8 +233,8 @@ export default function Cart() {
                               <span 
                                 className="text-xs text-[#4D1D54] font-bold"
                                 style={{ 
-                                  fontFamily: item.customization.fonte === 'Hello Valentica' 
-                                    ? '"Hello Valentica", sans-serif'
+                                  fontFamily: (item.customization.fonte === 'Hello Valentica' || item.customization.fonte === 'Hello Valentina')
+                                    ? '"Hello Valentina", sans-serif'
                                     : item.customization.fonte === 'Cream Cake'
                                     ? '"Cream Cake", sans-serif'
                                     : item.customization.fonte === 'Billion Miracles'
@@ -295,6 +256,12 @@ export default function Cart() {
                           {item.customization.caricatura && (
                             <div className="pt-1.5 mt-1.5 border-t border-dashed border-stone-200 text-[10px] text-[#8C6A3B] font-bold">
                               🎨 Caricatura Adicional Adicionada! ({item.customization.caricatura.qtd} personagem{item.customization.caricatura.qtd > 1 && 's'} - {item.customization.caricatura.estilo})
+                            </div>
+                          )}
+                          {item.customization.formaPagamento && (
+                            <div className="pt-1.5 mt-1.5 border-t border-dashed border-stone-200 text-[10px] text-green-700 font-extrabold flex items-center gap-1 flex-wrap">
+                              <span>✓ Pagamento Escolhido:</span>
+                              <span className="text-stone-700 font-bold">{item.customization.formaPagamento}</span>
                             </div>
                           )}
                         </div>
@@ -437,21 +404,13 @@ export default function Cart() {
             </div>
 
             {!showCheckout && (
-              <div className="space-y-4 pt-4">
-                {/* Pathway A: Buy via WhatsApp */}
-                <button 
-                  onClick={handleWhatsAppBuy}
-                  className="w-full bg-green-500 hover:bg-green-600 text-white h-14 rounded-full font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2.5 shadow-xl shadow-green-900/20 hover:scale-105 transition-transform"
-                >
-                  <Send className="w-4 h-4" />
-                  COMPRAR PELO WHATSAPP (RÁPIDO)
-                </button>
-
-                {/* Pathway B: Buy via Traditional Checkout */}
+              <div className="pt-4">
+                {/* Traditional Checkout */}
                 <button 
                   onClick={() => setShowCheckout(true)}
-                  className="w-full bg-white text-brand-primary h-14 rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-brand-pink-light hover:scale-105 transition-transform shadow-lg"
+                  className="w-full bg-brand-primary hover:bg-brand-primary-light text-white h-14 rounded-full font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2.5 shadow-xl hover:scale-105 transition-all duration-300"
                 >
+                  <CreditCard className="w-4 h-4" />
                   PAGAR NO SITE (PIX/CARTÃO)
                 </button>
               </div>

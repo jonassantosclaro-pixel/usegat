@@ -3,7 +3,7 @@ import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, onSnapshot, set
 import { db, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { useAuth } from '@/src/lib/AuthContext';
 import { Link } from 'react-router-dom';
-import { Plus, Trash2, Edit3, Package, Users, ShoppingCart as OrderIcon, Database, ArrowLeft, Check, Search, RefreshCw, Ticket } from 'lucide-react';
+import { Plus, Trash2, Edit3, Package, Users, ShoppingCart as OrderIcon, Database, ArrowLeft, Check, Search, RefreshCw, Ticket, Settings as SettingsIcon, Layers, Tags } from 'lucide-react';
 import { formatPrice } from '@/src/lib/utils';
 import { FALLBACK_PRODUCTS } from '@/src/lib/productsData';
 
@@ -17,8 +17,32 @@ export default function AdminDashboard() {
   const [newCouponType, setNewCouponType] = useState<'percentage' | 'value'>('percentage');
   const [newCouponValue, setNewCouponValue] = useState(0);
 
+  // Databases States
+  const [dbCategories, setDbCategories] = useState<any[]>([]);
+  const [dbSubcategories, setDbSubcategories] = useState<any[]>([]);
+  const [dbVariations, setDbVariations] = useState<any[]>([]);
+
+  // Category Operations States
+  const [newCatId, setNewCatId] = useState('');
+  const [newCatName, setNewCatName] = useState('');
+  const [newCatDesc, setNewCatDesc] = useState('');
+  const [editingCategory, setEditingCategory] = useState<any>(null);
+
+  // Subcategory Operations States
+  const [newSubId, setNewSubId] = useState('');
+  const [newSubName, setNewSubName] = useState('');
+  const [newSubCategoryId, setNewSubCategoryId] = useState('');
+  const [editingSubcategory, setEditingSubcategory] = useState<any>(null);
+
+  // Variation Operations States
+  const [newVarId, setNewVarId] = useState('');
+  const [newVarName, setNewVarName] = useState('');
+  const [newVarCategoryId, setNewVarCategoryId] = useState('');
+  const [newVarOptionsText, setNewVarOptionsText] = useState('');
+  const [editingVariation, setEditingVariation] = useState<any>(null);
+
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'customers' | 'settings' | 'stock' | 'coupons'>('products');
+  const [activeTab, setActiveTab] = useState<'products' | 'orders' | 'customers' | 'settings' | 'stock' | 'coupons' | 'categories_manager'>('products');
   const [stockSearch, setStockSearch] = useState('');
   const [showAddModal, setShowAddModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState<any>(null);
@@ -115,16 +139,20 @@ export default function AdminDashboard() {
     name: '',
     description: '',
     price: 0,
-    imageUrl: '',
+    imageUrls: [] as string[],
     category: 'garrafas-termicas',
     subcategory: '',
     customizable: false,
     hasNameAndSurname: false,
+    hasNameAndSurnameSemAoVivo: false,
     isSuaHistoria: false,
     sku: '',
     detailedDescription: '',
-    stock: 0
+    stock: 0,
+    variations: [] as { name: string; price: number; stock: number }[]
   });
+  const [newVariation, setNewVariation] = useState({ name: '', price: 0, stock: 0 });
+
   const [uploadingProductImage, setUploadingProductImage] = useState(false);
 
   useEffect(() => {
@@ -159,6 +187,99 @@ export default function AdminDashboard() {
       setCoupons(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => {
       console.error("Coupons error:", error);
+    });
+
+    // Categories Real-time with auto-seeding
+    const unsubscribeCategories = onSnapshot(collection(db, 'categories'), async (snapshot) => {
+      if (snapshot.empty) {
+        console.log("Seeding default categories in real-time...");
+        const defaultCats = [
+          { id: 'garrafas-termicas', name: 'Garrafas Térmicas', description: 'Garrafas térmicas em aço inoxidável cirúrgico com personalização "Sua História" gravada à laser permanente.' },
+          { id: 'canecas', name: 'Canecas Exclusivas', description: 'Canecas em cerâmica premium e design Boho Chic natural. Desenhos minimalistas inspirados nas suas melhores lembranças.' },
+          { id: 'atacado', name: 'Orçamentos Corporativos & Atacado', description: 'Soluções em escala de brindes personalizados para sua empresa, casamento ou evento corporativo com gravação de alta fidelidade.' }
+        ];
+        for (const cat of defaultCats) {
+          try {
+            await setDoc(doc(db, 'categories', cat.id), {
+              name: cat.name,
+              description: cat.description,
+              createdAt: new Date().toISOString()
+            });
+          } catch (e) {
+            console.error("Error seeding default category:", cat.id, e);
+          }
+        }
+      } else {
+        setDbCategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }
+    }, (error) => {
+      console.error("Categories error:", error);
+    });
+
+    // Subcategories Real-time with auto-seeding
+    const unsubscribeSubcategories = onSnapshot(collection(db, 'subcategories'), async (snapshot) => {
+      if (snapshot.empty) {
+        console.log("Seeding default subcategories in real-time...");
+        const defaultSubs = [
+          { id: 'meu-jeito', name: 'MEU JEITO', categoryId: 'garrafas-termicas' },
+          { id: 'saude', name: 'SAÚDE', categoryId: 'garrafas-termicas' },
+          { id: 'engenharia', name: 'ENGENHARIA', categoryId: 'garrafas-termicas' },
+          { id: 'docencia', name: 'DOCÊNCIA', categoryId: 'garrafas-termicas' },
+          { id: 'advocacia', name: 'ADVOCACIA', categoryId: 'garrafas-termicas' },
+          { id: 'contador-adm', name: 'CONTADOR e ADM', categoryId: 'garrafas-termicas' },
+          { id: 'militar-policia', name: 'MILITAR / POLÍCIA', categoryId: 'garrafas-termicas' },
+          { id: 'ti', name: 'TI', categoryId: 'garrafas-termicas' },
+          { id: 'caricaturas', name: 'CARICATURAS', categoryId: 'canecas' },
+          { id: 'mesa', name: 'Para Mesa', categoryId: 'canecas' },
+          { id: 'amor', name: 'Amor Por Aí', categoryId: 'canecas' },
+          { id: 'corporativas-atacado', name: 'GARRAFAS TÉRMICAS', categoryId: 'atacado' },
+          { id: 'n-termicas-atacado', name: 'GARRAFAS NÃO TÉRMICAS', categoryId: 'atacado' },
+          { id: 'canecas-atacado', name: 'CANECAS', categoryId: 'atacado' }
+        ];
+        for (const sub of defaultSubs) {
+          try {
+            await setDoc(doc(db, 'subcategories', sub.id), {
+              name: sub.name,
+              categoryId: sub.categoryId,
+              createdAt: new Date().toISOString()
+            });
+          } catch (e) {
+            console.error("Error seeding default subcategory:", sub.id, e);
+          }
+        }
+      } else {
+        setDbSubcategories(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }
+    }, (error) => {
+      console.error("Subcategories error:", error);
+    });
+
+    // Variations Real-time with auto-seeding
+    const unsubscribeVariations = onSnapshot(collection(db, 'variations'), async (snapshot) => {
+      if (snapshot.empty) {
+        console.log("Seeding default variations in real-time...");
+        const defaultVars = [
+          { id: 'capacidade-gt', name: 'Capacidade', categoryId: 'garrafas-termicas', options: ['500ml', '750ml (+ R$ 20,00)', '1L (+ R$ 40,00)'] },
+          { id: 'tampa-gt', name: 'Tipo de Tampa', categoryId: 'garrafas-termicas', options: ['Tampa Hermética Convencional', 'Tampa de bico canudo premium (+ R$ 15,00)'] },
+          { id: 'acabamento-cn', name: 'Acabamento Caneca', categoryId: 'canecas', options: ['Off-White Boho Chic Brilho', 'Fosco Rústico Boho (+ R$ 5,00)', 'Borda Dourada Real (+ R$ 12,00)'] }
+        ];
+        for (const v of defaultVars) {
+          try {
+            await setDoc(doc(db, 'variations', v.id), {
+              name: v.name,
+              categoryId: v.categoryId,
+              options: v.options,
+              createdAt: new Date().toISOString()
+            });
+          } catch (e) {
+            console.error("Error seeding default variation:", v.id, e);
+          }
+        }
+      } else {
+        setDbVariations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }
+    }, (error) => {
+      console.error("Variations error:", error);
     });
 
      // Merge any loose settings documents into a single 'global' document and load it once
@@ -220,6 +341,9 @@ export default function AdminDashboard() {
       unsubscribeOrders();
       unsubscribeCustomers();
       unsubscribeCoupons();
+      unsubscribeCategories();
+      unsubscribeSubcategories();
+      unsubscribeVariations();
     };
   }, [isAdmin]);
 
@@ -266,6 +390,164 @@ export default function AdminDashboard() {
     } catch (error: any) {
       console.error("Error updating coupon:", error);
       alert("Erro ao atualizar status do cupom: " + error.message);
+    }
+  };
+
+  // --- Category Handlers ---
+  const handleAddCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newCatId.trim() || !newCatName.trim()) {
+      alert("Código (Slug) e Nome da Categoria são obrigatórios!");
+      return;
+    }
+    const cleanId = newCatId.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '');
+    try {
+      await setDoc(doc(db, 'categories', cleanId), {
+        name: newCatName.trim(),
+        description: newCatDesc.trim(),
+        createdAt: new Date().toISOString()
+      });
+      setNewCatId('');
+      setNewCatName('');
+      setNewCatDesc('');
+      alert("Categoria adicionada com sucesso!");
+    } catch (error: any) {
+      console.error("Error adding category:", error);
+      alert("Erro ao adicionar categoria: " + error.message);
+    }
+  };
+
+  const handleUpdateCategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingCategory) return;
+    try {
+      await updateDoc(doc(db, 'categories', editingCategory.id), {
+        name: editingCategory.name.trim(),
+        description: editingCategory.description?.trim() || ''
+      });
+      setEditingCategory(null);
+      alert("Categoria atualizada com sucesso!");
+    } catch (error: any) {
+      console.error("Error updating category:", error);
+      alert("Erro ao atualizar categoria: " + error.message);
+    }
+  };
+
+  const handleDeleteCategory = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta categoria? Os produtos associados poderão ficar sem categoria!")) return;
+    try {
+      await deleteDoc(doc(db, 'categories', id));
+      alert("Categoria excluída com sucesso!");
+    } catch (error: any) {
+      console.error("Error deleting category:", error);
+      alert("Erro ao excluir categoria: " + error.message);
+    }
+  };
+
+  // --- Subcategory Handlers ---
+  const handleAddSubcategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newSubId.trim() || !newSubName.trim() || !newSubCategoryId) {
+      alert("Código, Nome e Categoria Pai são obrigatórios!");
+      return;
+    }
+    const cleanId = newSubId.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '');
+    try {
+      await setDoc(doc(db, 'subcategories', cleanId), {
+        name: newSubName.trim(),
+        categoryId: newSubCategoryId,
+        createdAt: new Date().toISOString()
+      });
+      setNewSubId('');
+      setNewSubName('');
+      setNewSubCategoryId('');
+      alert("Subcategoria adicionada com sucesso!");
+    } catch (error: any) {
+      console.error("Error adding subcategory:", error);
+      alert("Erro ao adicionar subcategory: " + error.message);
+    }
+  };
+
+  const handleUpdateSubcategory = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingSubcategory) return;
+    try {
+      await updateDoc(doc(db, 'subcategories', editingSubcategory.id), {
+        name: editingSubcategory.name.trim(),
+        categoryId: editingSubcategory.categoryId
+      });
+      setEditingSubcategory(null);
+      alert("Subcategoria atualizada com sucesso!");
+    } catch (error: any) {
+      console.error("Error updating subcategory:", error);
+      alert("Erro ao atualizar subcategoria: " + error.message);
+    }
+  };
+
+  const handleDeleteSubcategory = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta subcategoria?")) return;
+    try {
+      await deleteDoc(doc(db, 'subcategories', id));
+      alert("Subcategoria excluída com sucesso!");
+    } catch (error: any) {
+      console.error("Error deleting subcategory:", error);
+      alert("Erro ao excluir subcategoria: " + error.message);
+    }
+  };
+
+  // --- Variation Handlers ---
+  const handleAddVariation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newVarId.trim() || !newVarName.trim() || !newVarOptionsText.trim()) {
+      alert("Código, Nome e Opções da Variação são obrigatórios!");
+      return;
+    }
+    const cleanId = newVarId.trim().toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9_-]/g, '');
+    const optionsArr = newVarOptionsText.split(',').map(o => o.trim()).filter(Boolean);
+    try {
+      await setDoc(doc(db, 'variations', cleanId), {
+        name: newVarName.trim(),
+        categoryId: newVarCategoryId || '',
+        options: optionsArr,
+        createdAt: new Date().toISOString()
+      });
+      setNewVarId('');
+      setNewVarName('');
+      setNewVarCategoryId('');
+      setNewVarOptionsText('');
+      alert("Variação adicionada com sucesso!");
+    } catch (error: any) {
+      console.error("Error adding variation:", error);
+      alert("Erro ao adicionar variação: " + error.message);
+    }
+  };
+
+  const handleUpdateVariation = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingVariation) return;
+    const optionsArr = (editingVariation.optionsText || '').split(',').map((o: string) => o.trim()).filter(Boolean);
+    try {
+      await updateDoc(doc(db, 'variations', editingVariation.id), {
+        name: editingVariation.name.trim(),
+        categoryId: editingVariation.categoryId || '',
+        options: optionsArr
+      });
+      setEditingVariation(null);
+      alert("Variação atualizada com sucesso!");
+    } catch (error: any) {
+      console.error("Error updating variation:", error);
+      alert("Erro ao atualizar variação: " + error.message);
+    }
+  };
+
+  const handleDeleteVariation = async (id: string) => {
+    if (!confirm("Tem certeza que deseja excluir esta variação?")) return;
+    try {
+      await deleteDoc(doc(db, 'variations', id));
+      alert("Variação excluída com sucesso!");
+    } catch (error: any) {
+      console.error("Error deleting variation:", error);
+      alert("Erro ao excluir variação: " + error.message);
     }
   };
 
@@ -482,7 +764,7 @@ export default function AdminDashboard() {
           .then(data => {
             setNewProduct((prev: any) => ({
               ...prev,
-              imageUrl: data.imageUrl
+              imageUrls: [...prev.imageUrls, data.imageUrl]
             }));
             setUploadingProductImage(false);
           })
@@ -490,7 +772,7 @@ export default function AdminDashboard() {
             console.error("Local upload failed, keeping base64 as fallback:", err);
             setNewProduct((prev: any) => ({
               ...prev,
-              imageUrl: optimizedBase64
+              imageUrls: [...prev.imageUrls, optimizedBase64]
             }));
             setUploadingProductImage(false);
           });
@@ -576,15 +858,18 @@ export default function AdminDashboard() {
   const handleAddProduct = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
+      const productPayload = {
+        ...newProduct,
+        imageUrl: newProduct.imageUrls[0] || '',
+        price: Number(newProduct.price),
+        variations: newProduct.variations,
+      };
+
       if (editingProduct) {
-        await updateDoc(doc(db, 'products', editingProduct.id), {
-          ...newProduct,
-          price: Number(newProduct.price),
-        });
+        await updateDoc(doc(db, 'products', editingProduct.id), productPayload);
       } else {
         await addDoc(collection(db, 'products'), {
-          ...newProduct,
-          price: Number(newProduct.price),
+          ...productPayload,
           createdAt: new Date().toISOString(),
         });
       }
@@ -602,16 +887,19 @@ export default function AdminDashboard() {
       name: product.name,
       description: product.description || '',
       price: product.price,
-      imageUrl: product.imageUrl,
+      imageUrls: product.imageUrls || (product.imageUrl ? [product.imageUrl] : []),
       category: product.category,
       subcategory: product.subcategory || '',
       customizable: product.customizable || false,
       hasNameAndSurname: product.hasNameAndSurname || false,
+      hasNameAndSurnameSemAoVivo: product.hasNameAndSurnameSemAoVivo || false,
       isSuaHistoria: product.isSuaHistoria || false,
       sku: product.sku || '',
       detailedDescription: product.detailedDescription || '',
-      stock: product.stock || 0
+      stock: product.stock || 0,
+      variations: product.variations || []
     });
+    setNewVariation({ name: '', price: 0, stock: 0 });
     setShowAddModal(true);
   };
 
@@ -736,7 +1024,7 @@ export default function AdminDashboard() {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
+    <div id="admin-panel" className="max-w-7xl mx-auto px-6 lg:px-10 py-12">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-12 gap-6">
         <div>
           <div className="flex items-center gap-4 mb-4">
@@ -746,19 +1034,20 @@ export default function AdminDashboard() {
             </Link>
           </div>
           <h1 className="text-4xl font-serif font-black tracking-tight text-brand-black mb-2">Painel de Controle</h1>
-          <div className="flex gap-4 mt-6">
+          <div className="flex gap-4 mt-6 flex-wrap">
             {[
               { id: 'products', label: 'Produtos', icon: Package },
               { id: 'stock', label: 'Estoque & Sincronização', icon: Database },
               { id: 'orders', label: `Pedidos (${orders.length})`, icon: OrderIcon },
               { id: 'coupons', label: `Cupons (${coupons.length})`, icon: Ticket },
+              { id: 'categories_manager', label: 'Categorias & Variações', icon: Layers },
               { id: 'customers', label: `Clientes (${customers.length})`, icon: Users },
-              { id: 'settings', label: 'Configurações', icon: Database },
+              { id: 'settings', label: 'Configurações', icon: SettingsIcon },
             ].map((tab) => (
               <button 
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                className={`text-[10px] font-black uppercase tracking-[0.2em] px-6 py-3 rounded-xl transition-all flex items-center gap-2 ${activeTab === tab.id ? 'bg-brand-pink-strong text-white shadow-md' : 'bg-white text-brand-gray border border-brand-pink-light hover:bg-[#FAF7F8]'}`}
+                className={`text-[10px] font-black uppercase tracking-[0.15em] px-6 py-3 rounded-xl transition-all flex items-center gap-2 cursor-pointer ${activeTab === tab.id ? 'bg-black text-white shadow-lg ring-2 ring-black font-black scale-105' : 'bg-stone-100 text-stone-900 border border-stone-300 hover:bg-stone-200 font-bold'}`}
               >
                 <tab.icon className="w-3 h-3" />
                 {tab.label}
@@ -770,14 +1059,14 @@ export default function AdminDashboard() {
           <div className="flex gap-4">
             <button 
               onClick={handleSyncVitrine}
-              className="bg-[#FAF7F8] text-brand-pink-strong px-6 py-4 rounded-full font-black uppercase tracking-widest text-[9px] hover:bg-brand-pink-light hover:scale-105 transition-all flex items-center gap-2 border border-brand-pink-light shadow-sm"
+              className="bg-black text-white px-6 py-4 rounded-full font-black uppercase tracking-widest text-[9px] hover:bg-zinc-850 hover:scale-105 transition-all flex items-center gap-2 shadow-sm cursor-pointer"
             >
-              <RefreshCw className="w-3 h-3" />
+              <RefreshCw className="w-3 h-3 animate-spin-slow" />
               Sincronizar Vitrine
             </button>
             <button 
               onClick={handleSeedData}
-              className="bg-white text-brand-gray px-6 py-4 rounded-full font-black uppercase tracking-widest text-[9px] hover:bg-[#FAF7F8] transition-all flex items-center gap-2 border border-brand-pink-light"
+              className="bg-stone-100 text-stone-900 px-6 py-4 rounded-full font-black uppercase tracking-widest text-[9px] hover:bg-stone-200 transition-all flex items-center gap-2 border border-stone-300 cursor-pointer"
             >
               <Database className="w-3 h-3" />
               Resetar Categorias
@@ -794,6 +1083,7 @@ export default function AdminDashboard() {
                   subcategory: '',
                   customizable: false,
                   hasNameAndSurname: false,
+                  hasNameAndSurnameSemAoVivo: false,
                   isSuaHistoria: false,
                   sku: '',
                   detailedDescription: '',
@@ -801,7 +1091,7 @@ export default function AdminDashboard() {
                 });
                 setShowAddModal(true);
               }}
-              className="bg-brand-gold text-white px-8 py-4 rounded-full font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-transform flex items-center shadow-lg"
+              className="bg-black hover:bg-zinc-800 text-white px-8 py-4 rounded-full font-black uppercase tracking-widest text-[10px] hover:scale-105 transition-transform flex items-center shadow-lg cursor-pointer"
             >
               <Plus className="w-4 h-4 mr-3" />
               Novo Produto
@@ -812,7 +1102,7 @@ export default function AdminDashboard() {
           <div className="flex gap-4">
             <button 
               onClick={handleSyncVitrine}
-              className="bg-brand-pink-light text-brand-pink-strong px-6 py-4 rounded-full font-black uppercase tracking-widest text-[9px] hover:bg-[#FAF7F8] transition-all flex items-center gap-2 border border-brand-pink-light shadow-sm"
+              className="bg-black text-white px-6 py-4 rounded-full font-black uppercase tracking-widest text-[9px] hover:bg-zinc-850 transition-all flex items-center gap-2 shadow-sm cursor-pointer"
             >
               <RefreshCw className="w-3 h-3" />
               Sincronizar Vitrine
@@ -822,19 +1112,46 @@ export default function AdminDashboard() {
       </div>
 
       {activeTab === 'products' ? (
-        <div className="bg-white rounded-[40px] p-8 shadow-sm border border-brand-pink-light">
-          <h2 className="text-xl font-serif font-black mb-8 text-brand-black italic">Gerenciar Produtos</h2>
+        <div className="bg-white rounded-[40px] p-8 shadow-sm border border-zinc-200">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
+            <h2 className="text-xl font-serif font-black text-brand-black italic">Gerenciar Produtos</h2>
+            <button 
+              onClick={() => {
+                setEditingProduct(null);
+                setNewProduct({
+                  name: '',
+                  description: '',
+                  price: 0,
+                  imageUrl: '',
+                  category: 'garrafas-termicas',
+                  subcategory: '',
+                  customizable: false,
+                  hasNameAndSurname: false,
+                  hasNameAndSurnameSemAoVivo: false,
+                  isSuaHistoria: false,
+                  sku: '',
+                  detailedDescription: '',
+                  stock: 0
+                });
+                setShowAddModal(true);
+              }}
+              className="bg-black hover:bg-zinc-800 text-white px-8 py-3.5 rounded-full font-black uppercase tracking-widest text-xs flex items-center shadow-lg cursor-pointer transition-all"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Adicionar Produto
+            </button>
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-brand-pink-light pb-4">
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Imagem</th>
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Produto</th>
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">SKU</th>
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Categoria</th>
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Estoque</th>
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium">Preço</th>
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-brand-pink-medium text-right">Ações</th>
+                <tr className="border-b border-zinc-200 pb-4">
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black">Imagem</th>
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black">Produto</th>
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black">SKU</th>
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black">Categoria</th>
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black">Estoque</th>
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black">Preço</th>
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black text-right">Ações</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-pink-light/30">
@@ -898,13 +1215,13 @@ export default function AdminDashboard() {
           <div className="overflow-x-auto">
             <table className="w-full text-left">
               <thead>
-                <tr className="border-b border-brand-pink-light pb-4">
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-[#B48A4E]">Imagem</th>
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-[#B48A4E]">Produto</th>
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-[#B48A4E]">SKU</th>
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-[#B48A4E]">Categoria</th>
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-[#B48A4E]">Status</th>
-                  <th className="pb-4 text-[9px] font-black uppercase tracking-widest text-[#B48A4E] text-center">Quantidade em Estoque</th>
+                <tr className="border-b border-zinc-200 pb-4">
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black">Imagem</th>
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black">Produto</th>
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black">SKU</th>
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black">Categoria</th>
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black">Status</th>
+                  <th className="pb-4 text-[11px] font-black uppercase tracking-widest text-black text-center">Quantidade em Estoque</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-brand-pink-light/30">
@@ -1571,13 +1888,79 @@ export default function AdminDashboard() {
                           />
                         </div>
                         <div>
-                          <label className="text-[9px] font-bold text-brand-gold mb-1 block uppercase">URL da Imagem</label>
+                          <label className="text-[9px] font-bold text-brand-gold mb-1 block uppercase font-black">URL da Imagem</label>
                           <input
                             className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-xl p-3 text-xs font-mono"
                             value={currentPost.img}
                             onChange={(e) => handlePostChange('img', e.target.value)}
                             placeholder="https://i.postimg.cc/..."
                           />
+                          <div className="flex items-center gap-3 mt-1.5">
+                            <label className="cursor-pointer bg-[#4D1D54] hover:bg-opacity-90 active:scale-95 transition-all text-white text-[9px] font-black uppercase tracking-widest px-4 py-2 rounded-full text-center">
+                              📁 Carregar Imagem
+                              <input 
+                                type="file" 
+                                accept="image/*" 
+                                className="hidden" 
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  if (file.size > 5 * 1024 * 1024) {
+                                    alert("A imagem selecionada é muito grande! Escolha um arquivo menor de 5MB.");
+                                    return;
+                                  }
+                                  const reader = new FileReader();
+                                  reader.onload = (uploadEvent) => {
+                                    const base64String = uploadEvent.target?.result as string;
+                                    const img = new Image();
+                                    img.src = base64String;
+                                    img.onload = () => {
+                                      const canvas = document.createElement('canvas');
+                                      let width = img.width;
+                                      let height = img.height;
+                                      const MAX_SIZE = 1200;
+                                      if (width > MAX_SIZE || height > MAX_SIZE) {
+                                        if (width > height) {
+                                          height = Math.round((height * MAX_SIZE) / width);
+                                          width = MAX_SIZE;
+                                        } else {
+                                          width = Math.round((width * MAX_SIZE) / height);
+                                          height = MAX_SIZE;
+                                        }
+                                      }
+                                      canvas.width = width;
+                                      canvas.height = height;
+                                      const ctx = canvas.getContext('2d');
+                                      if (ctx) {
+                                        ctx.drawImage(img, 0, 0, width, height);
+                                        const optimizedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+                                        fetch('/api/upload', {
+                                          method: 'POST',
+                                          headers: { 'Content-Type': 'application/json' },
+                                          body: JSON.stringify({ image: optimizedBase64 }),
+                                        })
+                                        .then(res => {
+                                          if (!res.ok) throw new Error("Falha no upload");
+                                          return res.json();
+                                        })
+                                        .then(data => {
+                                          handlePostChange('img', data.imageUrl);
+                                        })
+                                        .catch(err => {
+                                          console.error("Local upload failed, keeping base64 as fallback:", err);
+                                          handlePostChange('img', optimizedBase64);
+                                        });
+                                      }
+                                    };
+                                  };
+                                  reader.readAsDataURL(file);
+                                }} 
+                              />
+                            </label>
+                            {currentPost.img && (
+                              <span className="text-[10px] text-green-600 font-bold">✓ Carregada</span>
+                            )}
+                          </div>
                         </div>
                         <div>
                           <label className="text-[9px] font-bold text-brand-gold mb-1 block uppercase">Link de Redirecionamento (Reel/Post)</label>
@@ -1851,43 +2234,116 @@ export default function AdminDashboard() {
                       <div className="space-y-3">
                         <label className="text-[9px] font-black uppercase tracking-widest text-[#4D1D54]/75 block">Imagem Completa / Banner para {item.label}</label>
                         <div className="flex flex-col gap-2 bg-[#FAF7F8] p-4 rounded-xl border border-brand-pink-light">
-                          <input
-                            className="w-full bg-white border border-brand-pink-light rounded-lg p-2.5 text-xs font-mono outline-none focus:border-brand-gold"
-                            value={settings[imgKey] || ''}
-                            onChange={(e) => setSettings({ ...settings, [imgKey]: e.target.value })}
-                            placeholder="URL da Imagem ou envie do computador abaixo..."
-                          />
+                        <div className="flex flex-col gap-2">
+                          {(Array.isArray(settings[imgKey]) ? settings[imgKey] : (settings[imgKey] ? [settings[imgKey]] : [])).map((imgUrl: string, idx: number) => (
+                            <div key={idx} className="relative group w-full">
+                              <input
+                                className="w-full bg-white border border-brand-pink-light rounded-lg p-2.5 text-xs font-mono outline-none focus:border-brand-gold pr-16"
+                                value={imgUrl}
+                                onChange={(e) => {
+                                    const newArray = [...(Array.isArray(settings[imgKey]) ? settings[imgKey] : (settings[imgKey] ? [settings[imgKey]] : []))];
+                                    newArray[idx] = e.target.value;
+                                    setSettings({ ...settings, [imgKey]: newArray });
+                                }}
+                                placeholder="URL da Imagem..."
+                              />
+                               <button 
+                                  type="button" 
+                                  onClick={() => {
+                                      const newArray = [...(Array.isArray(settings[imgKey]) ? settings[imgKey] : (settings[imgKey] ? [settings[imgKey]] : []))];
+                                      newArray.splice(idx, 1);
+                                      setSettings({ ...settings, [imgKey]: newArray });
+                                  }} 
+                                  className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] font-bold text-red-500 uppercase tracking-wider hover:underline"
+                                >
+                                  Remover
+                                </button>
+                            </div>
+                          ))}
+                        </div>
                           <div className="flex items-center gap-3">
                             <label className="cursor-pointer bg-[#4D1D54] hover:bg-opacity-90 active:scale-95 transition-all text-white text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full text-center">
-                              📁 Carregar Imagem
+                              📁 Adicionar Imagem
                               <input 
                                 type="file" 
                                 accept="image/*" 
                                 className="hidden" 
-                                onChange={(e) => handleImageUpload(e, imgKey)} 
+                                onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    
+                                    if (file.size > 5 * 1024 * 1024) {
+                                      alert("A imagem selecionada é muito grande! Escolha um arquivo menor de 5MB.");
+                                      return;
+                                    }
+
+                                    const reader = new FileReader();
+                                    reader.onload = (uploadEvent) => {
+                                        const base64String = uploadEvent.target?.result as string;
+                                        const current = Array.isArray(settings[imgKey]) ? settings[imgKey] : (settings[imgKey] ? [settings[imgKey]] : []);
+                                        setSettings((prev: any) => ({ ...prev, [imgKey]: [...current, base64String] }));
+
+                                        const img = new Image();
+                                        img.src = base64String;
+                                        img.onload = () => {
+                                          const canvas = document.createElement('canvas');
+                                          let width = img.width;
+                                          let height = img.height;
+                                          const MAX_SIZE = 1200;
+                                          if (width > MAX_SIZE || height > MAX_SIZE) {
+                                            if (width > height) {
+                                              height = Math.round((height * MAX_SIZE) / width);
+                                              width = MAX_SIZE;
+                                            } else {
+                                              width = Math.round((width * MAX_SIZE) / height);
+                                              height = MAX_SIZE;
+                                            }
+                                          }
+                                          canvas.width = width;
+                                          canvas.height = height;
+                                          const ctx = canvas.getContext('2d');
+                                          if (ctx) {
+                                            ctx.drawImage(img, 0, 0, width, height);
+                                            const optimizedBase64 = canvas.toDataURL('image/jpeg', 0.75);
+                                            
+                                            fetch('/api/upload', {
+                                              method: 'POST',
+                                              headers: { 'Content-Type': 'application/json' },
+                                              body: JSON.stringify({ image: optimizedBase64 })
+                                            })
+                                            .then(res => res.json())
+                                            .then(data => {
+                                              if (data.imageUrl) {
+                                                setSettings((prev: any) => {
+                                                  const currentList = Array.isArray(prev[imgKey]) ? prev[imgKey] : (prev[imgKey] ? [prev[imgKey]] : []);
+                                                  const cleanList = currentList.map(url => url === base64String ? data.imageUrl : url);
+                                                  return { ...prev, [imgKey]: cleanList };
+                                                });
+                                              }
+                                            })
+                                            .catch(err => {
+                                              console.error("Local configuration upload failed:", err);
+                                            });
+                                          }
+                                        };
+                                    };
+                                    reader.readAsDataURL(file);
+                                }} 
                               />
                             </label>
-                            {settings[imgKey] && (
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-green-600 font-bold">✓ Carregada</span>
-                                <button 
-                                  type="button" 
-                                  onClick={() => setSettings({ ...settings, [imgKey]: '' })} 
-                                  className="text-[9px] font-bold text-red-500 uppercase tracking-wider hover:underline"
-                                >
-                                  Remover
-                                </button>
-                              </div>
-                            )}
                           </div>
                           {settings[imgKey] && (
-                            <div className="mt-2 max-w-xs max-h-48 rounded-lg overflow-hidden border border-stone-200 bg-white shadow-xs p-1 flex items-center justify-center">
-                              <img 
-                                src={settings[imgKey]} 
-                                alt={`Preview ${item.label}`} 
-                                className="max-w-full max-h-40 object-contain rounded" 
-                                referrerPolicy="no-referrer"
-                              />
+                            <div className="flex flex-col gap-2 mt-2">
+                              {(Array.isArray(settings[imgKey]) ? settings[imgKey] : [settings[imgKey]]).filter(Boolean).map((imgUrl, i) => (
+                                <div key={i} className="max-w-xs rounded-lg overflow-hidden border border-stone-200 bg-white shadow-xs p-1 flex items-center justify-center">
+                                  <img 
+                                    src={imgUrl} 
+                                    alt={`Preview ${item.label} ${i + 1}`} 
+                                    className="max-w-full max-h-40 object-contain rounded" 
+                                    referrerPolicy="no-referrer"
+                                  />
+                                </div>
+                              ))}
                             </div>
                           )}
                         </div>
@@ -1900,9 +2356,10 @@ export default function AdminDashboard() {
 
             <button
               type="submit"
-              className="w-full bg-brand-primary text-white py-6 rounded-full font-black uppercase tracking-widest text-[11px] shadow-xl hover:shadow-brand-primary/20 transition-all transform hover:scale-[1.02]"
+              className="w-full bg-black hover:bg-zinc-800 text-white py-6 rounded-full font-black uppercase tracking-widest text-xs shadow-xl transition-all transform hover:scale-[1.02] cursor-pointer flex items-center justify-center gap-2"
             >
-              🚀 PROPAGAR ALTERAÇÕES EM TEMPO REAL NO SITE
+              <Check className="w-4 h-4 text-white" />
+              SALVAR CONFIGURAÇÕES DO PAINEL
             </button>
           </form>
 
@@ -2037,6 +2494,323 @@ export default function AdminDashboard() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        </div>
+      ) : activeTab === 'categories_manager' ? (
+        <div className="bg-white rounded-[40px] p-8 md:p-12 shadow-sm border border-brand-pink-light space-y-12">
+          <div>
+            <h2 className="text-3xl font-serif font-black text-brand-black italic">Categorias, Subcategorias e Variações</h2>
+            <p className="text-xs text-brand-gray font-medium uppercase tracking-widest mt-2">Gerencie toda a estrutura do catálogo do site em tempo real, sincronizado diretamente com o banco de dados</p>
+            <div className="w-24 h-1 bg-[#B48A4E] mt-4 rounded-full"></div>
+          </div>
+
+          <div className="grid grid-cols-1 xl:grid-cols-3 gap-10">
+            {/* COLUMN 1: CATEGORIES */}
+            <div className="space-y-6">
+              <div className="border border-brand-pink-medium/20 bg-[#FAF7F8]/30 rounded-3xl p-6 space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-widest text-brand-primary border-b border-brand-pink-medium/10 pb-2">
+                  📁 {editingCategory ? 'Editar Categoria' : 'Adicionar Categoria'}
+                </h3>
+                <form onSubmit={editingCategory ? handleUpdateCategory : handleAddCategory} className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-1 block">Código / Slug (Fixo)</label>
+                    <input
+                      required
+                      type="text"
+                      disabled={!!editingCategory}
+                      placeholder="Ex: canecas"
+                      value={editingCategory ? editingCategory.id : newCatId}
+                      onChange={(e) => editingCategory ? null : setNewCatId(e.target.value)}
+                      className="w-full bg-white border border-brand-pink-light rounded-2xl p-3 text-xs font-bold outline-none focus:border-brand-gold transition-all disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-1 block">Nome da Categoria</label>
+                    <input
+                      required
+                      type="text"
+                      placeholder="Ex: Canecas Exclusivas"
+                      value={editingCategory ? editingCategory.name : newCatName}
+                      onChange={(e) => editingCategory ? setEditingCategory({ ...editingCategory, name: e.target.value }) : setNewCatName(e.target.value)}
+                      className="w-full bg-white border border-brand-pink-light rounded-2xl p-3 text-xs font-bold outline-none focus:border-brand-gold transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-1 block">Descrição</label>
+                    <textarea
+                      placeholder="Ex: Canecas feitas à mão..."
+                      value={editingCategory ? editingCategory.description : newCatDesc}
+                      onChange={(e) => editingCategory ? setEditingCategory({ ...editingCategory, description: e.target.value }) : setNewCatDesc(e.target.value)}
+                      className="w-full bg-white border border-brand-pink-light rounded-2xl p-3 text-xs font-bold outline-none focus:border-brand-gold transition-all min-h-[60px]"
+                    />
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      className="flex-1 bg-brand-primary text-white py-3 rounded-xl font-bold uppercase tracking-widest text-[9px] hover:bg-stone-800 transition-all cursor-pointer"
+                    >
+                      {editingCategory ? 'Salvar' : 'Adicionar'}
+                    </button>
+                    {editingCategory && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingCategory(null)}
+                        className="bg-stone-100 text-stone-600 border border-stone-200 px-4 rounded-xl font-bold uppercase tracking-widest text-[9px] hover:bg-stone-200 transition-all cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-brand-gray mb-2">Categorias Ativas ({dbCategories.length})</h4>
+                <div className="space-y-3">
+                  {dbCategories.map((cat) => (
+                    <div key={cat.id} className="bg-white border border-brand-pink-light/60 hover:border-brand-gold/60 rounded-2xl p-4 flex justify-between items-start transition-all">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-brand-black">{cat.name}</span>
+                          <span className="text-[8px] font-mono bg-stone-100 border border-stone-200 text-stone-600 px-1.5 py-0.5 rounded-md uppercase text-[7px]">{cat.id}</span>
+                        </div>
+                        {cat.description && (
+                          <p className="text-[11px] text-brand-gray font-medium mt-1 line-clamp-2">{cat.description}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-1 ml-2 shrink-0">
+                        <button
+                          onClick={() => setEditingCategory({ id: cat.id, name: cat.name, description: cat.description || '' })}
+                          className="text-[#4D1D54] hover:text-[#2d1131] p-1.5 transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteCategory(cat.id)}
+                          className="text-red-500 hover:text-red-700 p-1.5 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* COLUMN 2: SUBCATEGORIES */}
+            <div className="space-y-6">
+              <div className="border border-brand-pink-medium/20 bg-[#FAF7F8]/30 rounded-3xl p-6 space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-widest text-brand-primary border-b border-brand-pink-medium/10 pb-2">
+                  🏷️ {editingSubcategory ? 'Editar Subcategoria' : 'Adicionar Subcategoria'}
+                </h3>
+                <form onSubmit={editingSubcategory ? handleUpdateSubcategory : handleAddSubcategory} className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-1 block">Código / ID (Fixo)</label>
+                    <input
+                      required
+                      type="text"
+                      disabled={!!editingSubcategory}
+                      placeholder="Ex: meu-jeito"
+                      value={editingSubcategory ? editingSubcategory.id : newSubId}
+                      onChange={(e) => editingSubcategory ? null : setNewSubId(e.target.value)}
+                      className="w-full bg-white border border-brand-pink-light rounded-2xl p-3 text-xs font-bold outline-none focus:border-brand-gold transition-all disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-1 block">Nome da Subcategoria</label>
+                    <input
+                      required
+                      type="text"
+                      placeholder="Ex: MEU JEITO"
+                      value={editingSubcategory ? editingSubcategory.name : newSubName}
+                      onChange={(e) => editingSubcategory ? setEditingSubcategory({ ...editingSubcategory, name: e.target.value }) : setNewSubName(e.target.value)}
+                      className="w-full bg-white border border-brand-pink-light rounded-2xl p-3 text-xs font-bold outline-none focus:border-brand-gold transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-1 block">Categoria Pai</label>
+                    <select
+                      required
+                      value={editingSubcategory ? editingSubcategory.categoryId : newSubCategoryId}
+                      onChange={(e) => editingSubcategory ? setEditingSubcategory({ ...editingSubcategory, categoryId: e.target.value }) : setNewSubCategoryId(e.target.value)}
+                      className="w-full bg-white border border-brand-pink-light rounded-2xl p-3 text-xs font-bold outline-none focus:border-brand-gold transition-all appearance-none"
+                    >
+                      <option value="">Selecione a Categoria</option>
+                      {dbCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      className="flex-1 bg-brand-primary text-white py-3 rounded-xl font-bold uppercase tracking-widest text-[9px] hover:bg-stone-800 transition-all cursor-pointer"
+                    >
+                      {editingSubcategory ? 'Salvar' : 'Adicionar'}
+                    </button>
+                    {editingSubcategory && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingSubcategory(null)}
+                        className="bg-stone-100 text-stone-600 border border-stone-200 px-4 rounded-xl font-bold uppercase tracking-widest text-[9px] hover:bg-stone-200 transition-all cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-brand-gray mb-2">Subcategorias Ativas ({dbSubcategories.length})</h4>
+                <div className="space-y-3">
+                  {dbSubcategories.map((sub) => (
+                    <div key={sub.id} className="bg-white border border-brand-pink-light/60 hover:border-brand-gold/60 rounded-2xl p-4 flex justify-between items-start transition-all">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-brand-black">{sub.name}</span>
+                          <span className="text-[8px] font-mono bg-stone-100 border border-stone-200 text-stone-600 px-1.5 py-0.5 rounded-md uppercase text-[7px]">{sub.id}</span>
+                        </div>
+                        <div className="text-[10px] text-brand-gold font-bold mt-1 uppercase tracking-wider">
+                          Pai: {dbCategories.find(c => c.id === sub.categoryId)?.name || sub.categoryId}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 ml-2 shrink-0">
+                        <button
+                          onClick={() => setEditingSubcategory({ id: sub.id, name: sub.name, categoryId: sub.categoryId })}
+                          className="text-[#4D1D54] hover:text-[#2d1131] p-1.5 transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteSubcategory(sub.id)}
+                          className="text-red-500 hover:text-red-700 p-1.5 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* COLUMN 3: VARIATIONS */}
+            <div className="space-y-6">
+              <div className="border border-brand-pink-medium/20 bg-[#FAF7F8]/30 rounded-3xl p-6 space-y-4">
+                <h3 className="text-xs font-black uppercase tracking-widest text-brand-primary border-b border-brand-pink-medium/10 pb-2">
+                  🎨 {editingVariation ? 'Editar Variação' : 'Adicionar Variação'}
+                </h3>
+                <form onSubmit={editingVariation ? handleUpdateVariation : handleAddVariation} className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-1 block">Código / ID (Fixo)</label>
+                    <input
+                      required
+                      type="text"
+                      disabled={!!editingVariation}
+                      placeholder="Ex: capacidade-gt"
+                      value={editingVariation ? editingVariation.id : newVarId}
+                      onChange={(e) => editingVariation ? null : setNewVarId(e.target.value)}
+                      className="w-full bg-white border border-brand-pink-light rounded-2xl p-3 text-xs font-bold outline-none focus:border-brand-gold transition-all disabled:opacity-50"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-1 block">Nome da Variação (Ex: Cor, Tamanho)</label>
+                    <input
+                      required
+                      type="text"
+                      placeholder="Ex: Capacidade, Cor, Acabamento"
+                      value={editingVariation ? editingVariation.name : newVarName}
+                      onChange={(e) => editingVariation ? setNewVarName(e.target.value) : setNewVarName(e.target.value)}
+                      className="w-full bg-white border border-brand-pink-light rounded-2xl p-3 text-xs font-bold outline-none focus:border-brand-gold transition-all"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-1 block">Categoria Associada (Opcional)</label>
+                    <select
+                      value={editingVariation ? editingVariation.categoryId : newVarCategoryId}
+                      onChange={(e) => editingVariation ? setEditingVariation({ ...editingVariation, categoryId: e.target.value }) : setNewVarCategoryId(e.target.value)}
+                      className="w-full bg-white border border-brand-pink-light rounded-2xl p-3 text-xs font-bold outline-none focus:border-brand-gold transition-all appearance-none"
+                    >
+                      <option value="">Todas as Categorias</option>
+                      {dbCategories.map((cat) => (
+                        <option key={cat.id} value={cat.id}>{cat.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-brand-gold mb-1 block">Opções (Separadas por Vírgula)</label>
+                    <input
+                      required
+                      type="text"
+                      placeholder="Ex: 500ml, 750ml (+ R$ 20,00)"
+                      value={editingVariation ? editingVariation.optionsText : newVarOptionsText}
+                      onChange={(e) => editingVariation ? setEditingVariation({ ...editingVariation, optionsText: e.target.value }) : setNewVarOptionsText(e.target.value)}
+                      className="w-full bg-white border border-brand-pink-light rounded-2xl p-3 text-xs font-bold outline-none focus:border-brand-gold transition-all"
+                    />
+                    <p className="text-[9px] text-brand-gray mt-1 leading-normal">Coloque os acréscimos de valores entre parênteses para exibir corretamente, ex: "750ml (+ R$ 20,00)".</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      type="submit"
+                      className="flex-1 bg-brand-primary text-white py-3 rounded-xl font-bold uppercase tracking-widest text-[9px] hover:bg-stone-800 transition-all cursor-pointer"
+                    >
+                      {editingVariation ? 'Salvar' : 'Adicionar'}
+                    </button>
+                    {editingVariation && (
+                      <button
+                        type="button"
+                        onClick={() => setEditingVariation(null)}
+                        className="bg-stone-100 text-[#4D1D54] border border-stone-200 px-4 rounded-xl font-bold uppercase tracking-widest text-[9px] hover:bg-stone-200 transition-all cursor-pointer"
+                      >
+                        Cancelar
+                      </button>
+                    )}
+                  </div>
+                </form>
+              </div>
+
+              <div className="space-y-4">
+                <h4 className="text-[10px] font-black uppercase tracking-widest text-brand-gray mb-2">Variações Ativas ({dbVariations.length})</h4>
+                <div className="space-y-3">
+                  {dbVariations.map((v) => (
+                    <div key={v.id} className="bg-white border border-brand-pink-light/60 hover:border-brand-gold/60 rounded-2xl p-4 flex justify-between items-start transition-all">
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-black text-brand-black">{v.name}</span>
+                          <span className="text-[8px] font-mono bg-stone-100 border border-stone-200 text-stone-600 px-1.5 py-0.5 rounded-md uppercase text-[7px]">{v.id}</span>
+                        </div>
+                        <div className="text-[9px] text-brand-gold font-bold uppercase">
+                          Filtro: {v.categoryId ? (dbCategories.find(c => c.id === v.categoryId)?.name || v.categoryId) : 'Todas as Categorias'}
+                        </div>
+                        <div className="flex flex-wrap gap-1 mt-1.5">
+                          {(v.options || []).map((opt: string, idx: number) => (
+                            <span key={idx} className="text-[9px] font-bold bg-stone-50 border border-stone-200/60 rounded-md px-1.5 py-0.5 text-brand-black">
+                              {opt}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex gap-1 ml-2 shrink-0">
+                        <button
+                          onClick={() => setEditingVariation({ id: v.id, name: v.name, categoryId: v.categoryId || '', optionsText: (v.options || []).join(', ') })}
+                          className="text-[#4D1D54] hover:text-[#2d1131] p-1.5 transition-colors"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                        </button>
+                        <button
+                          onClick={() => handleDeleteVariation(v.id)}
+                          className="text-red-500 hover:text-red-700 p-1.5 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -2188,19 +2962,45 @@ export default function AdminDashboard() {
                     value={newProduct.category}
                     onChange={(e) => setNewProduct({...newProduct, category: e.target.value})}
                   >
-                    <option value="garrafas-termicas">Garrafas Térmicas</option>
-                    <option value="canecas">Canecas</option>
-                    <option value="atacado">Atacado</option>
+                    {dbCategories.map(cat => (
+                      <option key={cat.id} value={cat.id}>{cat.name}</option>
+                    ))}
+                    {dbCategories.length === 0 && (
+                      <>
+                        <option value="garrafas-termicas">Garrafas Térmicas</option>
+                        <option value="canecas">Canecas</option>
+                        <option value="atacado">Atacado</option>
+                      </>
+                    )}
                   </select>
                 </div>
                 <div>
                    <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">Subcategoria</label>
-                   <input 
-                     className="w-full bg-brand-gray rounded-2xl p-4 font-bold outline-none"
-                     placeholder="Ex: Saúde, Engenharia, Atacado"
+                   <select 
+                     className="w-full bg-brand-gray rounded-2xl p-4 font-bold outline-none appearance-none"
                      value={newProduct.subcategory}
                      onChange={(e) => setNewProduct({...newProduct, subcategory: e.target.value})}
-                   />
+                   >
+                     <option value="">Nenhuma</option>
+                     {dbSubcategories
+                       .filter(sub => sub.categoryId === newProduct.category)
+                       .map(sub => (
+                         <option key={sub.id} value={sub.name}>{sub.name}</option>
+                       ))}
+                     {dbSubcategories.filter(sub => sub.categoryId === newProduct.category).length === 0 && (
+                       <>
+                         <option value="MEU JEITO">MEU JEITO</option>
+                         <option value="SAÚDE">SAÚDE</option>
+                         <option value="ENGENHARIA">ENGENHARIA</option>
+                         <option value="DOCÊNCIA">DOCÊNCIA</option>
+                         <option value="ADVOCACIA">ADVOCACIA</option>
+                         <option value="CONTADOR e ADM">CONTADOR e ADM</option>
+                         <option value="MILITAR / POLÍCIA">MILITAR / POLÍCIA</option>
+                         <option value="TI">TI</option>
+                         <option value="CARICATURAS">CARICATURAS</option>
+                       </>
+                     )}
+                   </select>
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-6">
@@ -2221,6 +3021,49 @@ export default function AdminDashboard() {
                     value={newProduct.stock}
                     onChange={(e) => setNewProduct({...newProduct, stock: Number(e.target.value)})}
                   />
+                </div>
+              </div>
+
+              <div className="bg-brand-gray p-4 rounded-2xl">
+                <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">Variações</label>
+                <div className="flex gap-2">
+                  <input
+                    placeholder="Nome da Variação"
+                    value={newVariation.name}
+                    onChange={(e) => setNewVariation(prev => ({...prev, name: e.target.value}))}
+                    className="w-full bg-white rounded-xl p-3 text-sm outline-none"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Preço R$"
+                    value={newVariation.price || ''}
+                    onChange={(e) => setNewVariation(prev => ({...prev, price: Number(e.target.value)}))}
+                    className="w-20 bg-white rounded-xl p-3 text-sm outline-none"
+                  />
+                  <input
+                    type="number"
+                    placeholder="Estoque"
+                    value={newVariation.stock || ''}
+                    onChange={(e) => setNewVariation(prev => ({...prev, stock: Number(e.target.value)}))}
+                    className="w-20 bg-white rounded-xl p-3 text-sm outline-none"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                       if (!newVariation.name || !newVariation.price) return;
+                       setNewProduct(prev => ({...prev, variations: [...prev.variations, newVariation]}));
+                       setNewVariation({ name: '', price: 0, stock: 0 });
+                    }}
+                    className="bg-brand-black text-white px-4 rounded-xl"
+                  >+</button>
+                </div>
+                <div className="mt-4 space-y-2">
+                  {newProduct.variations.map((v, i) => (
+                    <div key={i} className="flex justify-between bg-white p-2 rounded-lg text-sm">
+                      <span>{v.name} - R${v.price.toFixed(2)} ({v.stock} em estoque)</span>
+                      <button type="button" onClick={() => setNewProduct(prev => ({...prev, variations: prev.variations.filter((_, idx) => idx !== i)}))}>X</button>
+                    </div>
+                  ))}
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-6 p-4 bg-brand-gray/50 rounded-3xl">
@@ -2245,7 +3088,18 @@ export default function AdminDashboard() {
                         onChange={(e) => setNewProduct({...newProduct, hasNameAndSurname: e.target.checked})}
                         className="w-5 h-5 accent-brand-red"
                       />
-                      <label htmlFor="hasNameAndSurname" className="text-[10px] font-black uppercase tracking-widest">Nome + Sobrenome</label>
+                      <label htmlFor="hasNameAndSurname" className="text-[10px] font-black uppercase tracking-widest animate-pulse">Nome + Sobrenome (Ao Vivo)</label>
+                    </div>
+
+                    <div className="flex items-center gap-2 border-l-2 border-brand-gray pl-4">
+                      <input 
+                        type="checkbox" 
+                        id="hasNameAndSurnameSemAoVivo"
+                        checked={(newProduct as any).hasNameAndSurnameSemAoVivo || false}
+                        onChange={(e) => setNewProduct({...newProduct, hasNameAndSurnameSemAoVivo: e.target.checked})}
+                        className="w-5 h-5 accent-brand-red"
+                      />
+                      <label htmlFor="hasNameAndSurnameSemAoVivo" className="text-[10px] font-black uppercase tracking-widest">Nome + Sobrenome (Sem Ao Vivo)</label>
                     </div>
                     
                     <div className="flex items-center gap-2 border-l-2 border-brand-gray pl-4">
@@ -2262,18 +3116,11 @@ export default function AdminDashboard() {
                 )}
               </div>
               <div>
-                <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">Imagem do Produto</label>
+                <label className="text-[10px] font-black uppercase tracking-widest mb-2 block">Imagens do Produto</label>
                 <div className="flex flex-col gap-3 bg-brand-gray/30 p-4 rounded-3xl border border-brand-pink-light/30">
-                  <input 
-                    required
-                    className="w-full bg-white rounded-2xl p-4 font-bold outline-none border border-brand-pink-light/20 text-xs shadow-sm"
-                    placeholder="URL da Imagem ou faça upload abaixo..."
-                    value={newProduct.imageUrl}
-                    onChange={(e) => setNewProduct({...newProduct, imageUrl: e.target.value})}
-                  />
-                  <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-3">
                     <label className="cursor-pointer bg-[#4D1D54] hover:bg-opacity-90 active:scale-95 transition-all text-white text-[9px] font-black uppercase tracking-widest px-4 py-2.5 rounded-full text-center">
-                      📁 Escolher Imagem do Dispositivo
+                      📁 Adicionar Imagens do Dispositivo
                       <input 
                         type="file" 
                         accept="image/*" 
@@ -2282,33 +3129,47 @@ export default function AdminDashboard() {
                       />
                     </label>
                     {uploadingProductImage && (
-                      <span className="text-[10px] text-brand-gold animate-pulse font-bold">Enviando para o servidor...</span>
-                    )}
-                    {newProduct.imageUrl && !uploadingProductImage && (
-                      <div className="flex items-center gap-2">
-                        <span className="text-[10px] text-green-600 font-bold">✓ Imagem Selecionada</span>
-                        {newProduct.imageUrl.startsWith('/uploads/') && (
-                          <span className="text-[8px] opacity-60 font-mono text-stone-500 bg-stone-100 px-1 py-0.5 rounded">Pasta Uploads</span>
-                        )}
-                      </div>
+                      <span className="text-[10px] text-brand-gold animate-pulse font-bold">Enviando...</span>
                     )}
                   </div>
-                  {newProduct.imageUrl && (
-                    <div className="mt-2 w-24 h-24 rounded-2xl overflow-hidden border border-brand-pink-medium/20 bg-white shadow-sm flex items-center justify-center">
-                      <img 
-                        src={newProduct.imageUrl} 
-                        alt="Preview Produto" 
-                        className="max-w-full max-h-full object-contain" 
-                        referrerPolicy="no-referrer"
-                      />
+                  
+                  {newProduct.imageUrls.length > 0 && (
+                    <div className="grid grid-cols-1 gap-2 mt-2">
+                      {newProduct.imageUrls.map((imageUrl, idx) => (
+                        <div key={idx} className="relative w-full rounded-2xl overflow-hidden border border-brand-pink-medium/20 bg-white shadow-sm flex items-center justify-center p-2">
+                          <img 
+                            src={imageUrl} 
+                            alt={`Preview ${idx + 1}`} 
+                            className="max-w-full max-h-48 object-contain" 
+                            referrerPolicy="no-referrer"
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => setNewProduct({...newProduct, imageUrls: newProduct.imageUrls.filter((_, i) => i !== idx)})}
+                            className="absolute top-2 right-2 bg-red-500 text-white p-1 rounded-full text-[10px]"
+                          >
+                            X
+                          </button>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
               </div>
               <div className="flex gap-4 pt-6">
-                <button type="button" onClick={() => { setShowAddModal(false); setEditingProduct(null); }} className="flex-1 bg-brand-gray py-4 rounded-full font-black uppercase tracking-widest">Cancelar</button>
-                <button type="submit" className="flex-1 bg-brand-red text-white py-4 rounded-full font-black uppercase tracking-widest shadow-xl shadow-brand-red/20">
-                  {editingProduct ? 'Salvar Alterações' : 'Adicionar Produto'}
+                <button 
+                  type="button" 
+                  onClick={() => { setShowAddModal(false); setEditingProduct(null); }} 
+                  className="flex-1 bg-stone-100 hover:bg-stone-200 text-stone-900 py-4 rounded-full font-black uppercase tracking-widest text-xs transition-colors cursor-pointer"
+                >
+                  Cancelar
+                </button>
+                <button 
+                  type="submit" 
+                  className="flex-1 bg-black hover:bg-zinc-800 text-white py-4 rounded-full font-black uppercase tracking-widest text-xs shadow-xl transition-all cursor-pointer flex items-center justify-center gap-2"
+                >
+                  <Check className="w-4 h-4 text-white" />
+                  {editingProduct ? 'SALVAR ALTERAÇÕES' : 'SALVAR NOVO PRODUTO'}
                 </button>
               </div>
             </form>

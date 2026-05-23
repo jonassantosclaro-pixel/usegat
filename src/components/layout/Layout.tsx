@@ -4,6 +4,7 @@ import Footer from './Footer';
 import CartSidebar from '../cart/CartSidebar';
 import ChatAI from '../ChatAI';
 import { NewsletterPopup } from '../ui/NewsletterPopup';
+import InstallPrompt from './InstallPrompt';
 import { collection, onSnapshot } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 import { useLocation } from 'react-router-dom';
@@ -101,6 +102,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
       
       {!isAdminPage && <Footer />}
       {!isAdminPage && <NewsletterPopup />}
+      {!isAdminPage && <InstallPrompt />}
       
       {!isAdminPage && <ChatAI />}
 
