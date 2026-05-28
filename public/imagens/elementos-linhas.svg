@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <!-- Outer Pizza Slice Outline -->
+  <path d="M 50,5 Q 53,5 57,6 Q 63,8 70,12 C 78,17 84,23 90,32 C 94,38 95,44 95,48 C 95,50 93,52 82,54 L 50,90 L 18,54 C 7,52 5,50 5,48 C 5,44 6,38 10,32 C 16,23 22,17 30,12 Q 37,8 43,6 Q 47,5 50,5 Z" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" />
+  
+  <!-- Outer Crust Detail -->
+  <path d="M 50,8 Q 65,11 78,19 C 85,24 89,30 91,37" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" />
+  <path d="M 50,8 Q 35,11 22,19 C 15,24 11,30 9,37" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linecap="round" />
+
+  <!-- Inner Cheese Line Boundary -->
+  <path d="M 50,14 C 61,16 71,21 78,28 C 84,34 86,41 86,44 L 50,84 L 14,44 C 14,41 16,34 22,28 C 29,21 39,16 50,14 Z" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" />
+
+  <!-- Pepperonis (Circles) -->
+  <!-- Pepperoni 1 (Top Center) -->
+  <circle cx="50" cy="30" r="9" fill="none" stroke="currentColor" stroke-width="3.5" />
+  
+  <!-- Pepperoni 2 (Bottom Left) -->
+  <circle cx="34" cy="48" r="8" fill="none" stroke="currentColor" stroke-width="3.5" />
+
+  <!-- Pepperoni 3 (Bottom Right) -->
+  <circle cx="66" cy="48" r="8.5" fill="none" stroke="currentColor" stroke-width="3.5" />
+
+  <!-- Green Basil Leaf -->
+  <g transform="translate(50, 48) rotate(-15)">
+    <path d="M 0,-10 C 6,-10 10,-5 10,0 C 10,5 5,10 0,14 C -5,10 -10,5 -10,0 C -10,-5 -6,-10 0,-10 Z" fill="none" stroke="currentColor" stroke-width="3.5" stroke-linejoin="round" />
+    <path d="M 0,-10 L 0,10" fill="none" stroke="currentColor" stroke-width="3" />
+    <path d="M 0,-4 Q 4,-6 6,-8" fill="none" stroke="currentColor" stroke-width="2" />
+    <path d="M 0,1 Q -4,-1 -6,-3" fill="none" stroke="currentColor" stroke-width="2" />
+  </g>
+
+  <!-- Black Olives (Double Circles/Contours) -->
+  <!-- Olive 1 -->
+  <circle cx="36" cy="32" r="3.5" fill="none" stroke="currentColor" stroke-width="3.5" />
+  <!-- Olive 2 -->
+  <circle cx="62" cy="33" r="3.5" fill="none" stroke="currentColor" stroke-width="3.5" />
+  <!-- Olive 3 -->
+  <circle cx="50" cy="68" r="3.5" fill="none" stroke="currentColor" stroke-width="3.5" />
+</svg>

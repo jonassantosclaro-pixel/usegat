@@ -195,98 +195,127 @@ function getClientFAQResponse(userMessage: string): string {
 
   const text = normalize(userMessage);
 
+  // Define matcher rules (keywords & answers from the complete official FAQ)
   const rules = [
     {
-      keywords: ["personalizar", "personalizacao", "gravar", "nome", "foto", "dados", "texto", "preencher"],
-      answer: "Todos os produtos da USE GAT® são personalizados. 😊\nEm cada página de produto você encontrará os campos disponíveis para preenchimento, como nomes, frases, fotos, datas e outras informações específicas do item escolhido."
+      keywords: ["personalizar", "personalizacao", "gravar", "nome", "foto", "dados", "texto", "preencher", "frase", "parentesco", "data"],
+      answer: "Todos os produtos da USE GAT® são personalizados. 😊\n\nEm cada página de produto, a descrição informa exatamente o que pode ser incluído, como: nome, frase, parentesco, foto, data ou outras informações específicas. É de suma importância escolher as opções certas e ler a descrição!"
     },
     {
-      keywords: ["minha arte", "arte propria", "propria arte", "logotipo", "logo", "enviar arte", "enviar logo", "meu desenho"],
-      answer: "Sim! 😊 Caso possua arte própria ou logotipo, utilize a opção “MINHA ARTE” disponível no menu principal do site para realizar o envio do arquivo."
+      keywords: ["organizado", "organizada", "organizar", "claras", "informacoes enviadas", "observacoes"],
+      answer: "Quanto mais claras e bem organizadas estiverem as informações enviadas por você, melhor! 😊\n\nIsso ajuda a nossa equipe de produção a seguir exatamente como você imaginou. O site possui campos específicos do produto para preenchimento de textos e observações."
     },
     {
-      keywords: ["alterar arte", "mudar desenho", "mudar cor", "altera arte", "cor estrutural", "alterar cores", "mudar posicao", "mudar fonte"],
-      answer: "Não realizamos alterações estruturais. Os produtos seguem fielmente o modelo apresentado no anúncio.\n\nNão realizamos alterações em:\n- cores\n- layout\n- posição de elementos\n- desenhos\n- tipografia/fonte"
+      keywords: ["minha arte", "arte propria", "propria arte", "logotipo", "logo", "enviar arte", "enviar logo", "meu desenho", "meu logo", "upload logo"],
+      answer: "Sim! 😊 Se você possui uma arte própria ou logotipo, clique no campo 'MINHA ARTE' localizado no menu principal do ateliê. Lá você poderá fazer o upload de seu arquivo. Lembre-se apenas de ler atentamente as diretrizes de formato correto descritas na página de envio."
     },
     {
-      keywords: ["igual a foto", "igual à foto", "vai ser igual", "fidelidade", "ficar igual", "fiel"],
-      answer: "Sim! 😊 O produto final seguirá exatamente o modelo anunciado, alterando apenas os dados personalizados enviados pelo cliente."
+      keywords: ["alterar arte original", "alteracao de arte", "alteram a arte", "desenhos", "mudar cor", "alterar cores", "mudar posicao", "mudar fonte", "altera layout"],
+      answer: "Os produtos seguem fielmente o modelo apresentado no anúncio. Por esse motivo, nós não realizamos alterações estruturais em:\n- Cores da arte original ou dos elementos;\n- Posição dos elementos;\n- Desenhos ou ilustrações;\n- Layout geral;\n- Tipografia/fonte do anúncio.\n\nNa página do produto, preencha exatamente como deseja que os dados personalizados fiquem gravados."
+    },
+    {
+      keywords: ["igual a foto", "igual à foto", "vai ser igual", "fidelidade", "ficar igual", "fiel", "foto do site"],
+      answer: "Sim! 😊 O produto final seguirá fielmente o modelo anunciado e as estruturas originais, alterando apenas os textos, fotos e nomes personalizados enviados por você. Em itens com foto, a qualidade da imagem enviada é de inteira responsabilidade do cliente."
     },
     {
       keywords: ["previa", "ver antes", "esboco", "enviar previa", "ver a previa", "mostra arte", "amostra"],
-      answer: "Não enviamos prévias de arte para pedidos realizados pelo site. A personalização segue exatamente o modelo escolhido no anúncio."
+      answer: "Não enviamos prévias de arte para pedidos realizados pelo site, pois a personalização segue exatamente o modelo escolhido e configurado pelo cliente no anúncio do anúncio."
     },
     {
-      keywords: ["alterar pedido", "mudar pedido", "mudar dados", "corrigir", "errei", "errado", "alterar apos", "mudar nome"],
-      answer: "Sim, caso seja necessário corrigir alguma informação do seu pedido, entre em contato em até 24 horas após a compra.\n\nWhatsApp: (21) 4040-2224\nE-mail: meupedido@usegat.com\n\nApós esse prazo, o pedido entra em produção e não poderá mais ser alterado."
+      keywords: ["alterar arte depois", "corrigir dados", "mudar dados", "errei", "errado", "alterar apos", "corrigir nome", "revisar", "digitacao", "ortografia"],
+      answer: "Caso tenha preenchido alguma informação incorretamente, entre em contato conosco em até 24 horas no e-mail meupedido@usegat.com ou WhatsApp (21) 4040-2224 com o número do seu pedido.\n\nApós o prazo de 24 horas, o item segue para produção e não poderá mais ser alterado, cancelado ou reembolsado. O cliente é inteiramente responsável por revisar grafias, nomes e digitações enviadas."
     },
     {
       keywords: ["uma unidade", "1 unidade", "so uma", "só uma", "so de 1", "só de 1", "fazer uma", "comprar um", "comprar uma"],
-      answer: "Sim! 😊 Produzimos pedidos a partir de 1 unidade."
+      answer: "Sim! 😊 Nós produzimos perfeitamente a partir de 1 unidade para presentear quem você ama."
     },
     {
       keywords: ["minimo", "minima", "quantidade minima", "quantidade mínima", "pedido minimo"],
-      answer: "Não há quantidade mínima. 😊 Produzimos a partir de 1 unidade. Apenas pedidos no atacado possuem condições específicas."
+      answer: "Não há quantidade mínima para pedidos comuns na loja! Produzimos perfeitamente a partir de 1 unidade. Parcerias em atacado corporativo possuem condições próprias de volume."
     },
     {
-      keywords: ["atacado", "acima de 10", "comprar lote", "revenda", "lote", "vender", "desconto quantidade"],
-      answer: "Sim! 😊 Pedidos acima de 10 unidades possuem descontos especiais.\n\nPara fazer um orçamento de atacado, entre em contato via WhatsApp:\n(21) 4040-2224"
+      keywords: ["cores impressao", "tela do celular", "cores ficam iguais", "variacao de cor", "calibracao", "10%", "20%"],
+      answer: "As imagens do site podem apresentar variação de 10% a 20% nas cores do produto final. Isso se deve às variações de brilho e calibração das telas (celulares e monitores) e também à natureza física das superfícies graváveis como cerâmica, porcelana, vidro, alumínio ou aço inox."
     },
     {
-      keywords: ["prazo", "producao", "produzir", "tempo para fazer", "confeccao", "prazo de producao", "fazer"],
-      answer: "Após a confirmação do pagamento, o prazo de produção de cada peça personalizada (desenho e gravação) é de 5 a 7 dias úteis."
+      keywords: ["atacado", "acima de 10", "comprar lote", "revenda", "lote", "vender", "desconto quantidade", "lembranca corporativa"],
+      answer: "Sim! 😊 Para pedidos maiores, brindes de empresas ou lembranças corporativas, temos descontos especiais para compras acima de 10 unidades. Entre em contato por WhatsApp no 📞 (21) 4040-2224 ou clique na opção ATACADO no menu principal do site para solicitar seu orçamento personalizado."
     },
     {
-      keywords: ["urgente", "urgencia", "pressa", "rapido", "acelerar", "antecipar", "emergencia", "prazo curto"],
-      answer: "Sempre buscamos agilizar os pedidos! 😊 Porém seguimos o prazo padrão de produção de 5 a 7 dias úteis, além do prazo da transportadora."
+      keywords: ["prazo", "producao", "produzir", "tempo para fazer", "confeccao", "prazo de producao", "tempo de producao", "dias uteis"],
+      answer: "Após a confirmação do pagamento, nosso prazo cuidadoso de produção é de 5 a 7 dias úteis. Após esse período, o pedido será despachado via transportadora conforme o frete selecionado no checkout."
+    },
+    {
+      keywords: ["urgente", "urgencia", "pressa", "rapido", "acelerar", "antecipar", "emergencia", "prazo curto", "rio de janeiro", "brasilia"],
+      answer: "Somos originários do Rio de Janeiro, mas nosso ateliê produtivo está situado hoje em Brasília, seguindo seu calendário local de feriados. Sempre nos empenhamos para produzir e agilizar os envios, mas respeitamos a qualidade padrão do prazo de 5 a 7 dias úteis de produção. Tenha atenção ao programar compras de urgência!"
+    },
+    {
+      keywords: ["consigo receber antes", "chega antes", "data especifica", "receber antes", "autonomia", "data limite"],
+      answer: "Após a postagem de encomenda, todo o processo de tráfego, rastreamento físico, prazos e tentativas passa a ser de responsabilidade absoluta da transportadora escolhida. A USE GAT® não possui autonomia para intervir nos prazos ou agilizar trâmites das transportadoras, mas acompanhamos de perto e abrimos chamados (como em atrasos ou extravios) para assegurar o cliente."
     },
     {
       keywords: ["entrega", "prazo de entrega", "quanto tempo", "demora", "chegar", "transporte", "correio", "sedex", "pac"],
-      answer: "O prazo de entrega varia conforme a sua região e a transportadora escolhida no checkout. Após postarmos seu pedido nos Correios/transportadora, o prazo corre por conta deles."
+      answer: "O prazo de recebimento exibido na simulação e no checkout é fornecido e gerido pelas transportadoras parceiras e varia por região geográfica ou imprevistos de trânsito (obstáculos climáticos, greves, etc)."
     },
     {
       keywords: ["rastrear", "rastreio", "codigo de rastreio", "enviar rastreio", "acompanhar", "onde esta", "postagem"],
-      answer: "Assim que seu pedido for postado, nós enviaremos o código de rastreio oficial diretamente em seu e-mail cadastrado! 😊"
+      answer: "Sim! 😊 Assim que postado, o código e o link para rastreamento oficial da transportadora são enviados diretamente e de maneira automática para o seu e-mail cadastrado!"
     },
     {
-      keywords: ["todo o brasil", "entrega brasil", "envia para", "meu estado", "enviam para", "enviar para", "frete para"],
-      answer: "Sim! 😊 Realizamos envios seguros para todo o território nacional."
+      keywords: ["embalado", "embalagem", "embalar", "neutra", "presente", "pronto para presentear"],
+      answer: "Todos os nossos pedidos comuns de varejo são carinhosamente enviados prontos para presentear. Apenas lotes de atacado são expedidos em caixas neutras protetoras para otimizar os custos de investimento dos nossos clientes."
     },
     {
-      keywords: ["valor do frete", "quanto é o frete", "frete gratis", "frete pago", "calcular frete", "custo do frete"],
-      answer: "O valor do frete é calculado automaticamente no checkout ou diretamente na página do produto inserindo seu CEP."
-    },
-    {
-      keywords: ["retirar", "retirada", "pessoalmente", "pegar", "brasilia", "retirar em", "busca", "df"],
-      answer: "Sim! Para retirada pessoalmente em Brasília (DF), por favor, combine os detalhes conosco antecipadamente pelo WhatsApp: (21) 4040-2224 antes de finalizar a compra."
-    },
-    {
-      keywords: ["formas de pagamento", "pagar", "pagamento", "boleto", "cartao", "pix", "aceita", "parcela", "credito"],
-      answer: "Aceitamos Pix, cartão de crédito (em até 10x) e boleto bancário.\n\nTodo o pagamento é processado com 100% de segurança via PAGBANK®."
+      keywords: ["formas de pagamento", "pagar", "pagamento", "boleto", "cartao", "pix", "aceita", "parcela", "credito", "pagbank"],
+      answer: "Contamos com um checkout criptografado e certificado por SSL. Oferecemos processamento extremamente seguro via PAGBANK® nas seguintes opções:\n- Pix (com 10% de desconto automático)\n- Cartão de Crédito (simulações de parcelas visíveis em tempo real)\n- Boleto Bancário"
     },
     {
       keywords: ["desconto pix", "pix tem desconto", "desconto no pix", "pago no pix", "pagamento pix"],
-      answer: "Sim! 😊 Compras realizadas via Pix ganham automaticamente 10% de desconto no valor de todos os produtos do carrinho."
+      answer: "Sim! Compras realizadas com pagamento via Pix recebem um desconto excelente de 10% de forma imediata (calculado sobre o subtotal de produtos, não abrangendo o frete)."
     },
     {
-      keywords: ["parcelar", "parcelamento", "parcelas", "vezes", "dividir", "credito 10x"],
-      answer: "Sim! 😊 Parcelamos em até 10x no cartão de crédito, sendo em até 3x sem juros."
+      keywords: ["parcelar", "parcelamento", "parcelas", "vezes", "dividir", "credito 10x", "sem juros"],
+      answer: "Sim! 😊 Você poderá parcelar as suas compras em até 10 vezes no cartão de crédito. Sendo em até 3 parcelas, os juros são por nossa conta (sem juros)."
     },
     {
-      keywords: ["quebrado", "defeito", "avaria", "danificado", "estragou", "quebrou", "amassou", "riscado"],
-      answer: "Fique tranquilo(a)! Se houver avarias no transporte ou qualquer defeito do ateliê, garantimos a substituição sem custos. Entre em contato em até 7 dias no e-mail: sac@usegat.com"
+      keywords: ["todo o brasil", "entrega brasil", "envia para", "meu estado", "enviam para", "enviar para", "frete para"],
+      answer: "Sim! Realizamos entregas oficiais e seguras em todos os estados do território brasileiro."
     },
     {
-      keywords: ["trocar personalizado", "troca de personalizado", "trocar garrafa", "trocar caneca", "troca"],
-      answer: "Por serem peças únicas e sob medida, trocas de itens personalizados são realizadas exclusivamente em caso de defeito de fabricação ou danos no transporte relatados em até 7 dias corridos."
+      keywords: ["valor do frete", "quanto é o frete", "frete gratis", "frete pago", "calcular frete", "custo do frete"],
+      answer: "O frete é calculado de forma automática baseando-se no CEP inserido. Você poderá simular o frete e prazos na página de cada produto ou diretamente na finalização de carrinho."
     },
     {
-      keywords: ["devolver", "arrependi", "cancelar", "desistir", "devolucao", "arrependimento"],
-      answer: "Conforme o Artigo 49 do Código de Defesa do Consumidor, produtos sob medida e totalmente personalizados não possuem direito de devolução por arrependimento, por serem inviáveis para revenda."
+      keywords: ["retirar", "retirada", "pessoalmente", "pegar", "brasilia", "retirar em", "busca", "df"],
+      answer: "Se você reside em Brasília, realizamos retiradas em mãos sob agendamento prévio. Por favor, entre em contato via WhatsApp no 📞 (21) 4040-2224 antes de fechar sua compra no site para obter o código correto."
     },
     {
-      keywords: ["desbota", "sai", "lava louca", "lavar", "durabilidade", "qualidade", "microondas", "micro-ondas"],
-      answer: "Não desbota e não sai! 😊 Nossas gravações a laser e impressões de cerâmica são de altíssima qualidade. Recomendamos apenas lavar com o lado macio da bucha, evitar produtos abrasivos e evitar lava-louças para durabilidade eterna."
+      keywords: ["quebrado", "defeito", "avaria", "danificado", "estragou", "quebrou", "amassou", "riscado", "sac@usegat.com"],
+      answer: "Se porventura o seu produto apresentar algum defeito de fabricação ou danos causados no transporte físico da logística, entre em contato no e-mail sac@usegat.com em até 7 dias corridos após o recebimento.\n\nApós confirmada a ocorrência com as fotos, providenciaremos imediatamente o seu reembolso total ou a produção e novo reenvio gratuito do item!"
+    },
+    {
+      keywords: ["atrasar", "atrase", "nao chegar", "extravio", "ressarcimento", "atraso"],
+      answer: "A USE GAT® acompanha o status do pedido diariamente. Se o frete for confirmed como extraviado pela transportadora parceira, nós providenciaremos a reposição imediata da peça personalizada ou o ressarcimento integral do seu dinheiro, sem burocracias."
+    },
+    {
+      keywords: ["tentativas de entrega", "correios voltando", "retornar ao remetente", "nao havia ninguem", "tentaram entregar", "destinatario ausente"],
+      answer: "A transportadora realiza até 3 tentativas de entrega formais. Caso o destinatário esteja ausente em todas elas, o pacote retornará ao nosso ateliê em Brasília. Um novo custo de frete será cobrado do cliente para efetuar a re-postagem da mercadoria."
+    },
+    {
+      keywords: ["trocar personalizado", "troca de personalizado", "trocar garrafa", "trocar caneca", "troca", "devolver personalizado", "desistir", "arrependimento", "art 49"],
+      answer: "De acordo com o Art. 49 do Código de Defesa do Consumidor, por se tratarem de artigos confeccionados sob medida e únicos de forma personalizada, não realizamos devoluções ou trocas motivadas por arrependimento simples do cliente. As substituições ocorrem estritamente sob ocorrências de avarias logísticas ou defeitos de fabricação relatados em até 7 dias."
+    },
+    {
+      keywords: ["diferente do que pedi", "produto errado", "veio trocado", "dados errados", "veio diferente"],
+      answer: "Se você identificou qualquer erro em relação ao pedido efetuado no site, tire fotos nítidas do produto recebido e envie para sac@usegat.com ou meupedido@usegat.com junto ao código da sua compra para correção."
+    },
+    {
+      keywords: ["desbota", "sai", "lava louca", "lavar", "durabilidade", "qualidade", "esponja"],
+      answer: "Nossos produtos possuem máxima qualidade e durabilidade eterna! Não desbota no uso cotidiano. Indicamos apenas lavar com a parte amarela e macia da esponja, evitar solventes abrasivos e não submeter à lavadora de louças industrial."
+    },
+    {
+      keywords: ["garantia", "oferece garantia", "garantia cobre"],
+      answer: "Sim! Oferecemos garantia cobre exclusivamente qualquer defeito de produção/insumo que for reportado num raio de até 7 dias corridos a contar da entrega realizada."
     }
   ];
 

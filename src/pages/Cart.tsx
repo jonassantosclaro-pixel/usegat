@@ -4,7 +4,7 @@ import { formatPrice } from '@/src/lib/utils';
 import { ShoppingBag, X, Trash2, ArrowLeft, CheckSquare, Gift, Heart, CreditCard } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import CheckoutForm from '../components/CheckoutForm';
 import { PaymentMethods } from '../components/cart/PaymentMethods';
 import axios from 'axios';
@@ -12,7 +12,7 @@ import { collection, query, where, getDocs } from 'firebase/firestore';
 import { db } from '@/src/lib/firebase';
 
 export default function Cart() {
-  const { items, removeItem, total, clearCart, subtotal, discountAmount, appliedCoupon, applyCoupon } = useCart();
+  const { items, removeItem, total, clearCart, subtotal, discountAmount, appliedCoupon, applyCoupon, addItem } = useCart();
   const { user } = useAuth();
   const navigate = useNavigate();
   const [showCheckout, setShowCheckout] = useState(false);
@@ -23,6 +23,28 @@ export default function Cart() {
 
   // Custom Gift wraps state (+R$ 9,90)
   const [addGiftWrap, setAddGiftWrap] = useState(false);
+
+  // Leve + Pague Menos Promo Products
+  const [promoProducts, setPromoProducts] = useState<any[]>([]);
+  const [promoLoading, setPromoLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchPromoProducts = async () => {
+      try {
+        const querySnapshot = await getDocs(collection(db, 'products'));
+        const list = querySnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        }));
+        setPromoProducts(list);
+      } catch (err) {
+        console.error("Error fetching promotional products:", err);
+      } finally {
+        setPromoLoading(false);
+      }
+    };
+    fetchPromoProducts();
+  }, []);
 
   const handleProcessOrder = async (customerData: any) => {
     try {
@@ -72,6 +94,14 @@ export default function Cart() {
   const activeShippingCost = isFreeShipping ? 0 : (showCheckout ? shippingCost : 18.00);
   const finalSubtotal = Math.max(0, subtotal - progressiveDiscount - discountAmount + giftWrapTotal);
   const finalTotal = finalSubtotal + activeShippingCost;
+
+  const suggestedProducts = promoProducts
+    .filter(p => !items.some(item => item.id === p.id))
+    .slice(0, 4);
+  
+  const displayPromoProducts = suggestedProducts.length > 0 
+    ? suggestedProducts 
+    : promoProducts.slice(0, 4);
 
   const handleApplyCoupon = async () => {
     if (!couponInput.trim()) return;
@@ -283,6 +313,79 @@ export default function Cart() {
                   </motion.div>
                 ))}
               </AnimatePresence>
+
+              {/* Promo section "Leve + Pague Menos" */}
+              {!showCheckout && displayPromoProducts.length > 0 && (
+                <div id="leve-mais-pague-menos" className="bg-[#FAF7F8] border border-brand-gold/20 p-6 sm:p-8 rounded-[2.5rem] mt-6 space-y-6">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4 justify-between border-b border-brand-gold/10 pb-4">
+                    <div className="flex items-start gap-4">
+                      <div className="w-12 h-12 rounded-full bg-brand-gold/10 flex items-center justify-center text-brand-gold shrink-0">
+                        <Gift className="w-6 h-6 text-[#8C6A3B] animate-bounce" />
+                      </div>
+                      <div>
+                        <h4 className="font-serif font-black text-brand-black text-lg md:text-xl">Leve + Pague Menos! 🔥</h4>
+                        <p className="text-xs text-brand-gray font-semibold leading-normal">
+                          Adicione um desses queridinhos ao carrinho com <span className="text-[#8C6A3B] font-bold">15% de DESCONTO</span> exclusivo neste item!
+                        </p>
+                      </div>
+                    </div>
+                    <span className="bg-[#8C6A3B] text-white text-[9px] font-black uppercase tracking-widest px-3 py-1.5 rounded-full shadow-sm whitespace-nowrap">
+                      Desconto automático!
+                    </span>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {displayPromoProducts.map((p) => {
+                      const promoPrice = p.price * 0.85;
+                      return (
+                        <div 
+                          key={p.id} 
+                          className="flex items-center gap-3 bg-white p-3.5 rounded-[2rem] border border-stone-150 hover:border-brand-gold/30 hover:shadow-md transition-all group"
+                        >
+                          <div className="w-14 h-14 bg-[#FAF7F8] rounded-2xl overflow-hidden p-1 flex-shrink-0 flex items-center justify-center border border-stone-100 group-hover:scale-105 transition-transform">
+                            <img 
+                              src={p.imageUrl || "/imagens/mugs-boho.jpg"} 
+                              alt={p.name} 
+                              className="w-full h-full object-contain" 
+                            />
+                          </div>
+                          <div className="flex-grow space-y-1 min-w-0">
+                            <h5 className="font-serif italic font-bold text-xs text-brand-black truncate">{p.name}</h5>
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className="text-[10px] text-gray-400 line-through font-medium">
+                                {formatPrice(p.price)}
+                              </span>
+                              <span className="text-xs font-black text-brand-primary">
+                                {formatPrice(promoPrice)}
+                              </span>
+                              <span className="text-[8px] font-extrabold text-green-700 bg-green-50 px-1 py-0.5 rounded uppercase tracking-wider">
+                                15% OFF
+                              </span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            id={`add-promo-${p.id}`}
+                            onClick={() => {
+                              addItem({
+                                id: p.id,
+                                name: `${p.name} (Leve + Pague Menos)`,
+                                price: parseFloat(promoPrice.toFixed(2)),
+                                imageUrl: p.imageUrl || "/imagens/mugs-boho.jpg",
+                                quantity: 1,
+                                sku: p.sku || p.id.toUpperCase()
+                              });
+                            }}
+                            className="bg-brand-primary text-white hover:bg-brand-primary-light active:scale-95 text-[10px] font-black uppercase tracking-widest px-3 py-2 rounded-full transition-all shadow-sm shrink-0 whitespace-nowrap"
+                          >
+                            + Levar
+                          </button>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {/* Gift Wrapping Box surcharge selector */}
               {items.some(i => i.customization) && (

@@ -56,6 +56,8 @@ export default function Home() {
   // Newsletter states
   const [email, setEmail] = useState('');
   const [newsletterDiscountCode, setNewsletterDiscountCode] = useState<string | null>(null);
+  const [newsletterLoading, setNewsletterLoading] = useState(false);
+  const [newsletterError, setNewsletterError] = useState<string | null>(null);
 
   // Testimonials Slider state & data
   const [currentReview, setCurrentReview] = useState(0);
@@ -167,12 +169,46 @@ export default function Home() {
     });
   };
 
-  const handleNewsletterSubmit = (e: React.FormEvent) => {
+  const handleNewsletterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email.trim()) return;
-    // Simulate automatic custom cupom generation
-    setNewsletterDiscountCode("PRIMEIRAGAT10");
-    setEmail('');
+    setNewsletterError(null);
+    const trimmedEmail = email.trim();
+    if (!trimmedEmail) return;
+
+    // Strict email client-side regex check
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(trimmedEmail)) {
+      setNewsletterError("Por favor, insira um endereço de e-mail válido com @ e domínio!");
+      return;
+    }
+
+    setNewsletterLoading(true);
+
+    try {
+      const response = await fetch('/api/send-coupon', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ email: trimmedEmail }),
+      });
+
+      const data = await response.json();
+
+      if (response.ok && data.success) {
+        setNewsletterDiscountCode(data.coupon || "PRIMEIRAGAT10");
+        setEmail('');
+      } else {
+        setNewsletterError(data.error || "Algo deu errado ao gerar o seu cupom. Tente novamente!");
+      }
+    } catch (err: any) {
+      console.error("Newsletter submission error:", err);
+      // Fallback
+      setNewsletterDiscountCode("PRIMEIRAGAT10");
+      setEmail('');
+    } finally {
+      setNewsletterLoading(false);
+    }
   };
 
   return (
@@ -315,23 +351,32 @@ export default function Home() {
             </div>
           </div>
 
-          <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row w-full md:w-auto gap-3 items-stretch">
-            <input 
-              type="email" 
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="Digite seu melhor e-mail"
-              className="bg-white/80 border border-brand-gold/20 px-6 py-4 rounded-full flex-grow md:w-80 font-medium text-sm outline-none focus:border-brand-primary transition-all shadow-inner w-full"
-              required
-            />
-            <button 
-              type="submit"
-              className="bg-brand-primary text-white px-6 sm:px-8 py-4 rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-brand-primary-light transition-all flex items-center justify-center gap-2 shrink-0 shadow-lg w-full sm:w-auto"
-            >
-              <Send className="w-4 h-4" />
-              QUERO MEU CUPOM
-            </button>
-          </form>
+          <div className="flex flex-col w-full md:w-auto">
+            <form onSubmit={handleNewsletterSubmit} className="flex flex-col sm:flex-row w-full gap-3 items-stretch">
+              <input 
+                type="email" 
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="Digite seu melhor e-mail"
+                className="bg-white/80 border border-brand-gold/20 px-6 py-4 rounded-full flex-grow md:w-80 font-medium text-sm outline-none focus:border-brand-primary transition-all shadow-inner w-full"
+                required
+                disabled={newsletterLoading}
+              />
+              <button 
+                type="submit"
+                disabled={newsletterLoading}
+                className="bg-brand-primary disabled:opacity-60 text-white px-6 sm:px-8 py-4 rounded-full font-black uppercase tracking-widest text-[10px] hover:bg-brand-primary-light transition-all flex items-center justify-center gap-2 shrink-0 shadow-lg w-full sm:w-auto font-sans"
+              >
+                <Send className="w-4 h-4" />
+                {newsletterLoading ? "ENVIANDO..." : "QUERO MEU CUPOM"}
+              </button>
+            </form>
+            {newsletterError && (
+              <p className="text-red-700 text-xs mt-2 font-bold font-sans text-left ml-4 bg-red-50 py-1.5 px-3 rounded-xl border border-red-200">
+                ⚠️ {newsletterError}
+              </p>
+            )}
+          </div>
         </div>
 
         {/* Automatic Modal popup for new subscriber */}

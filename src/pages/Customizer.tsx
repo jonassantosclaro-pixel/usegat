@@ -361,18 +361,42 @@ export default function Customizer() {
                       {cat}
                     </button>
                   ))}
+                  <button
+                    onClick={() => setActiveCategory('caricatura' as any)}
+                    className={`px-4 py-1.5 rounded-full text-[8px] font-black uppercase tracking-widest whitespace-nowrap transition-all ${activeCategory === 'caricatura' ? 'bg-brand-primary text-white shadow-md' : 'bg-brand-pink-light text-gray-500 hover:text-brand-primary'}`}
+                  >
+                    Caricatura
+                  </button>
                 </div>
                 
                 <div className="grid grid-cols-3 gap-4">
-                  {iconCategories[activeCategory].map((url, idx) => (
-                    <button 
-                      key={idx} 
-                      onClick={() => addElement(url)}
-                      className="aspect-square bg-brand-pink-light rounded-2xl flex items-center justify-center p-2 hover:scale-110 active:scale-95 transition-all hover:bg-brand-primary/10"
-                    >
-                      <img src={url} alt="Element" className="w-full h-full object-contain" />
-                    </button>
-                  ))}
+                  {activeCategory === 'caricatura' ? (
+                    <div className="col-span-3 space-y-4">
+                      <p className="text-[10px] font-semibold text-stone-600">Deseja adicionar uma caricatura? Faça o upload da foto de uma pessoa ou pet que transformamos para você.</p>
+                      <div className="font-black text-brand-primary">💰 R$ 19,90</div>
+                      <hr className="border-t border-brand-pink-light" />
+                      <p className="text-[10px] font-semibold text-stone-600">Escolha um estilo:</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {['Realista', 'Desenho Cartoon', 'Charge', 'Flat'].map(estilo => (
+                          <button key={estilo} className="p-2 border border-brand-pink-light rounded-lg text-[9px] font-bold text-stone-700 hover:bg-brand-pink-light">{estilo}</button>
+                        ))}
+                      </div>
+                      <div className="w-full aspect-video border-2 border-dashed border-brand-pink-light rounded-xl flex flex-col items-center justify-center p-4 bg-white hover:border-brand-primary transition-colors">
+                        <Upload className="w-6 h-6 text-gray-300 mb-1" />
+                        <p className="text-[8px] font-black uppercase tracking-[0.2em] text-gray-400">Upload da Foto</p>
+                      </div>
+                    </div>
+                  ) : (
+                    iconCategories[activeCategory].map((url, idx) => (
+                      <button 
+                        key={idx} 
+                        onClick={() => addElement(url)}
+                        className="aspect-square bg-brand-pink-light rounded-2xl flex items-center justify-center p-2 hover:scale-110 active:scale-95 transition-all hover:bg-brand-primary/10"
+                      >
+                        <img src={url} alt="Element" className="w-full h-full object-contain" />
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
             )}
@@ -403,9 +427,9 @@ export default function Customizer() {
                         key={f.value}
                         onClick={() => setSelectedFont(f.value)}
                         style={{ fontFamily: f.value }}
-                        className={`p-3 rounded-xl text-xs transition-all border-2 ${selectedFont === f.value ? 'bg-brand-primary text-white border-brand-primary shadow-lg scale-105' : 'bg-brand-pink-light text-brand-primary border-transparent hover:border-brand-primary/30'}`}
+                        className={`p-3 rounded-xl text-md transition-all border-2 ${selectedFont === f.value ? 'bg-brand-primary text-white border-brand-primary shadow-lg scale-105' : 'bg-brand-pink-light text-brand-primary border-transparent hover:border-brand-primary/30'}`}
                       >
-                        {f.name}
+                        AMOR
                       </button>
                     ))}
                   </div>

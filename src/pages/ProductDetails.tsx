@@ -106,10 +106,12 @@ export default function ProductDetails() {
   const [diversosOutros, setDiversosOutros] = useState('');
 
   // Caricatura Configs
+  const [globalSettings, setGlobalSettings] = useState<any>(null);
   const [hasCaricatura, setHasCaricatura] = useState(false);
   const [caricaturasQtd, setCaricaturasQtd] = useState(1);
-  const [caricaturaEstilo, setCaricaturaEstilo] = useState<'colorido' | 'preto'>('colorido');
+  const [caricaturaEstilo, setCaricaturaEstilo] = useState<string>('Realista');
   const [caricaturaFile, setCaricaturaFile] = useState<string | null>(null);
+  const [caricaturaFile2, setCaricaturaFile2] = useState<string | null>(null); // For 2 caricaturas image uploads
 
   // Text inputs
   const [customName, setCustomName] = useState('');
@@ -298,6 +300,18 @@ export default function ProductDetails() {
     return () => unsubscribe();
   }, [product]);
 
+  useEffect(() => {
+    const settingsRef = doc(db, 'settings', 'global');
+    const unsubscribe = onSnapshot(settingsRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setGlobalSettings(docSnap.data());
+      }
+    }, (error) => {
+      console.warn("Could not load global settings in ProductDetails:", error);
+    });
+    return () => unsubscribe();
+  }, []);
+
   const getSelectedVariationsSurcharge = () => {
     let extra = 0;
     for (const [vName, vVal] of Object.entries(selectedVariations)) {
@@ -324,6 +338,10 @@ export default function ProductDetails() {
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Escolha um arquivo menor de 5MB.");
+        return;
+      }
       const reader = new FileReader();
       reader.onloadend = () => {
         setCaricaturaFile(reader.result as string);
@@ -332,8 +350,28 @@ export default function ProductDetails() {
     }
   };
 
-  // Caricatura adds R$ 35,00 extra per caricatura person
-  const caricaturaPriceExtra = hasCaricatura ? caricaturasQtd * 35.00 : 0;
+  const handleFileUpload2 = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        alert("Escolha um arquivo menor de 5MB.");
+        return;
+      }
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setCaricaturaFile2(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Caricatura dynamic pricing from database settings
+  const price1image = globalSettings?.caricatura_price_1 ? parseFloat(globalSettings.caricatura_price_1) : 19.90;
+  const price2images = globalSettings?.caricatura_price_2 ? parseFloat(globalSettings.caricatura_price_2) : 39.80;
+
+  const caricaturaPriceExtra = hasCaricatura 
+    ? (caricaturasQtd === 2 ? price2images : price1image) 
+    : 0;
   const variationsPriceExtra = getSelectedVariationsSurcharge();
   const productFinalPrice = product ? product.price + caricaturaPriceExtra + variationsPriceExtra : 0;
 
@@ -360,13 +398,22 @@ export default function ProductDetails() {
       if (selectedMomentos.includes("Outros") && !momentosOutros.trim()) errors.push("Por favor, especifique qual outro momento ou pessoa marcante você gostaria de incluir.");
       if (selectedDiversos.length < 2 || selectedDiversos.length > 5) errors.push("Selecione de 2 a 5 diversos.");
       if (selectedDiversos.includes("Outros") && !diversosOutros.trim()) errors.push("Por favor, especifique qual outro item diverso você gostaria de incluir.");
-      if (hasCaricatura && !caricaturaFile) errors.push("Por favor, faça o upload de pelo menos uma foto para a caricatura.");
     } else if (product?.customizable) {
       if (product.hasNameAndSurname || product.hasNameAndSurnameSemAoVivo) {
         if (!customName.trim()) errors.push("Por favor, preencha o campo de Nome.");
         if (!customSurname.trim()) errors.push("Por favor, preencha o campo de Sobrenome.");
       } else {
         if (!customName.trim()) errors.push("Por favor, preencha o campo de Nome Completo.");
+      }
+    }
+
+    // Caricature validation applies to all customizable products if hasCaricatura is toggled
+    if (hasCaricatura) {
+      if (!caricaturaFile) {
+        errors.push("Por favor, faça o upload da primeira foto para a caricatura.");
+      }
+      if (caricaturasQtd === 2 && !caricaturaFile2) {
+        errors.push("Por favor, faça o upload da segunda foto para a caricatura.");
       }
     }
 
@@ -415,7 +462,8 @@ export default function ProductDetails() {
         caricatura: hasCaricatura ? {
           qtd: caricaturasQtd,
           estilo: caricaturaEstilo,
-          foto: caricaturaFile
+          foto: caricaturaFile,
+          foto2: caricaturaFile2
         } : null
       };
     } else if (product?.customizable) {
@@ -425,7 +473,12 @@ export default function ProductDetails() {
         sobrenome: (product.hasNameAndSurname || product.hasNameAndSurnameSemAoVivo) ? customSurname : '',
         frase: customPhrase,
         fonte: selectedFont,
-        foto: caricaturaFile
+        caricatura: hasCaricatura ? {
+          qtd: caricaturasQtd,
+          estilo: caricaturaEstilo,
+          foto: caricaturaFile,
+          foto2: caricaturaFile2
+        } : null
       };
     }
 
@@ -458,23 +511,23 @@ export default function ProductDetails() {
   if (!product) return <div className="min-h-[60vh] flex items-center justify-center font-serif italic text-3xl text-brand-gold">Produto não encontrado.</div>;
 
   return (
-    <div className="max-w-7xl mx-auto px-6 lg:px-10 py-16">
+    <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-10 py-6 sm:py-16">
       {/* Back button */}
       <button 
         onClick={() => navigate(-1)}
-        className="flex items-center text-xs font-black uppercase tracking-widest mb-12 hover:text-[#4D1D54] transition-colors group"
+        className="flex items-center text-xs font-black uppercase tracking-widest mb-6 sm:mb-12 hover:text-[#4D1D54] transition-colors group"
       >
         <ChevronLeft className="w-5 h-5 mr-1 group-hover:-translate-x-1 transition-transform" />
         Voltar para a loja
       </button>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 lg:gap-24">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-24">
         {/* Left Column: Visual product view */}
-        <div className="space-y-8">
+        <div className="space-y-6 sm:space-y-8">
           <motion.div
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
-            className="bg-white/40 backdrop-blur-md rounded-[50px] p-12 aspect-square flex items-center justify-center shadow-sm border border-brand-pink-medium/30 relative overflow-hidden val-preview-box"
+            className="bg-white/40 backdrop-blur-md rounded-[24px] sm:rounded-[50px] p-4 sm:p-12 aspect-square flex items-center justify-center shadow-sm border border-brand-pink-medium/30 relative overflow-hidden val-preview-box"
           >
             <div 
               onMouseMove={handleMouseMove}
@@ -542,8 +595,8 @@ export default function ProductDetails() {
                               style={{ 
                                 fontSize: calculateFontSize(customName.trim() || 'Seu Nome', product.category),
                                 fontFamily: selectedFont === 'Quicksand' 
-                                  ? '"Quicksand", sans-serif' 
-                                  : `"${selectedFont}", "Quicksand", sans-serif`,
+                                  ? 'Quicksand, sans-serif' 
+                                  : `${selectedFont}, Quicksand, sans-serif`,
                                 textShadow: customName.trim() 
                                   ? '1px 1px 1px rgba(255,255,255,0.7), -0.5px -0.5px 0px rgba(0,0,0,0.15)' 
                                   : 'none',
@@ -606,8 +659,8 @@ export default function ProductDetails() {
                           style={{ 
                             fontSize: calculateFontSize(customName.trim() || 'Seu Nome', product.category),
                             fontFamily: selectedFont === 'Quicksand' 
-                              ? '"Quicksand", sans-serif' 
-                              : `"${selectedFont}", "Quicksand", sans-serif`,
+                              ? 'Quicksand, sans-serif' 
+                              : `${selectedFont}, Quicksand, sans-serif`,
                             textShadow: customName.trim() 
                               ? '1px 1px 1px rgba(255,255,255,0.7), -0.5px -0.5px 0px rgba(0,0,0,0.15)' 
                               : 'none',
@@ -746,34 +799,67 @@ export default function ProductDetails() {
 
           {/* DYNAMIC FORM */}
           {product.customizable ? (
-            <div className="bg-[#FAF7F8]/80 p-8 rounded-[40px] border border-brand-gold/15 space-y-10">
-              <h3 className="text-lg font-serif italic font-bold border-b border-brand-gold/10 pb-3 text-[#4D1D54]">
+            <div className="bg-[#FAF7F8]/80 p-4 sm:p-8 rounded-[24px] sm:rounded-[40px] border border-brand-gold/15 space-y-6 sm:space-y-10">
+              <h3 className="text-base sm:text-lg font-serif italic font-bold border-b border-brand-gold/10 pb-3 text-[#4D1D54]">
                 Responda o nosso Questionário de Criação
               </h3>
 
               {/* SECTION: Elements style tracker */}
               {product.isSuaHistoria && (
-                <div className="space-y-5">
-                  <span className="text-[10px] font-black uppercase tracking-widest text-[#4D1D54]">1. Tipo dos Elementos na Garrafa</span>
+                <div className="space-y-6">
+                  {/* Title and subtitle description */}
+                  <div className="space-y-2">
+                    <span className="text-[10px] font-black uppercase tracking-widest text-[#4D1D54] block">
+                      1. Tipo dos Elementos na Garrafa
+                    </span>
+                    <div className="bg-[#4D1D54]/5 p-4 rounded-xl border border-brand-gold/10 space-y-1">
+                      <p className="text-[11.5px] font-black text-[#4D1D54] uppercase tracking-wide">
+                        Vamos personalizar a sua garrafa
+                      </p>
+                      <p className="text-[10px] text-stone-600 font-medium leading-relaxed">
+                        Antes de escolhermos os elementos, defina como você deseja que ele seja estampado.
+                      </p>
+                    </div>
+                  </div>
                   
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-2 gap-2 sm:gap-4">
                     {/* Option 1: COLORIDO */}
                     <button
                       type="button"
                       onClick={() => setElementsStyle('colorido')}
-                      className={`p-5 rounded-[2rem] border-2 text-left space-y-3 transition-all ${
+                      className={`p-3 sm:p-5 rounded-[1.5rem] sm:rounded-[2.5rem] border-2 text-center space-y-2 sm:space-y-4 transition-all relative cursor-pointer flex flex-col items-center justify-between h-full ${
                         elementsStyle === 'colorido'
-                          ? 'border-[#4D1D54] bg-[#4D1D54]/5 shadow'
-                          : 'border-gray-200 bg-white hover:border-brand-gold/30'
+                          ? 'border-[#4D1D54] bg-[#4D1D54]/5 shadow-md scale-[1.02]'
+                          : 'border-gray-200 bg-white hover:border-brand-gold/30 hover:shadow-sm'
                       }`}
                     >
-                      <div className="flex justify-between items-center">
-                        <span className="text-xl">🎨</span>
-                        {elementsStyle === 'colorido' && <div className="w-5 h-5 bg-[#4D1D54] rounded-full flex items-center justify-center text-white text-[10px] font-black">✓</div>}
+                      {/* Selection indicator checkmark */}
+                      <div className="absolute top-2 sm:top-3 right-3 sm:right-4">
+                        {elementsStyle === 'colorido' ? (
+                          <div className="w-5 h-5 bg-[#4D1D54] rounded-full flex items-center justify-center text-white text-[10px] font-black shadow">✓</div>
+                        ) : (
+                          <div className="w-5 h-5 border border-stone-200 bg-white rounded-full" />
+                        )}
                       </div>
-                      <div>
-                        <h4 className="font-bold text-xs uppercase text-brand-black">ELEMENTOS COLORIDOS</h4>
-                        <p className="text-[10px] text-gray-500 font-medium leading-relaxed mt-1">Exemplo: Pizza fatiada colorida nas cores originais.</p>
+
+                      {/* Image container mimicking prompt screenshot layout */}
+                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-[#4D1D54] flex items-center justify-center p-2 sm:p-3.5 shadow-sm mt-3">
+                        <img 
+                          src="/imagens/elementos-coloridos.svg" 
+                          alt="Elementos Coloridos" 
+                          className="w-full h-full object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+
+                      <div className="text-center space-y-1 sm:space-y-1.5 w-full">
+                        <h4 className="font-black text-[9px] sm:text-[11px] uppercase tracking-wider text-brand-black">ELEMENTOS COLORIDOS</h4>
+                        <div className="space-y-1">
+                          <p className="text-[8.5px] sm:text-[9.5px] text-gray-500 font-medium leading-normal">Cores vibrantes, dando destaque à garrafa.</p>
+                          <span className="inline-block text-[7.5px] sm:text-[8px] font-black uppercase tracking-widest text-[#4D1D54] bg-brand-pink-medium/40 px-2 sm:px-2.5 py-0.5 rounded-full">
+                            (Mais escolhido)
+                          </span>
+                        </div>
                       </div>
                     </button>
 
@@ -781,47 +867,68 @@ export default function ProductDetails() {
                     <button
                       type="button"
                       onClick={() => setElementsStyle('preto')}
-                      className={`p-5 rounded-[2rem] border-2 text-left space-y-3 transition-all ${
+                      className={`p-3 sm:p-5 rounded-[1.5rem] sm:rounded-[2.5rem] border-2 text-center space-y-2 sm:space-y-4 transition-all relative cursor-pointer flex flex-col items-center justify-between h-full ${
                         elementsStyle === 'preto'
-                          ? 'border-[#4D1D54] bg-[#4D1D54]/5 shadow'
-                          : 'border-gray-200 bg-white hover:border-brand-gold/30'
+                          ? 'border-[#4D1D54] bg-[#4D1D54]/5 shadow-md scale-[1.02]'
+                          : 'border-gray-200 bg-white hover:border-brand-gold/30 hover:shadow-sm'
                       }`}
                     >
-                      <div className="flex justify-between items-center">
-                        <span className="text-xl">🔲</span>
-                        {elementsStyle === 'preto' && <div className="w-5 h-5 bg-[#4D1D54] rounded-full flex items-center justify-center text-white text-[10px] font-black">✓</div>}
+                      {/* Selection indicator checkmark */}
+                      <div className="absolute top-2 sm:top-3 right-3 sm:right-4">
+                        {elementsStyle === 'preto' ? (
+                          <div className="w-5 h-5 bg-[#4D1D54] rounded-full flex items-center justify-center text-white text-[10px] font-black shadow">✓</div>
+                        ) : (
+                          <div className="w-5 h-5 border border-stone-200 bg-white rounded-full" />
+                        )}
                       </div>
-                      <div>
-                        <h4 className="font-bold text-xs uppercase text-brand-black">APENAS LINHAS (PRETO)</h4>
-                        <p className="text-[10px] text-gray-500 font-medium leading-relaxed mt-1">Exemplo: Contorno fino em traço preto minimalista.</p>
+
+                      {/* Image container mimicking prompt screenshot layout */}
+                      <div className="w-16 h-16 sm:w-24 sm:h-24 rounded-full bg-white border border-stone-100 flex items-center justify-center p-2 sm:p-3.5 shadow-xs mt-3 text-brand-black">
+                        <img 
+                          src="/imagens/elementos-linhas.svg" 
+                          alt="Em Linhas" 
+                          className="w-full h-full object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                      </div>
+
+                      <div className="text-center space-y-1 sm:space-y-1.5 w-full">
+                        <h4 className="font-black text-[9px] sm:text-[11px] uppercase tracking-wider text-brand-black">EM LINHAS</h4>
+                        <p className="text-[8.5px] sm:text-[9.5px] text-gray-500 font-medium leading-normal">Sem destaque, sutil e minimalista.</p>
                       </div>
                     </button>
+                  </div>
+
+                  {/* Informative advice note regarding black or white strokes */}
+                  <div className="bg-[#FAF7F8]/60 p-4 rounded-2xl border border-[#4D1D54]/5 text-center text-[10.5px] text-stone-600 font-medium space-y-1.5">
+                    <p>💡 <span className="font-bold text-[#4D1D54]">Em garrafas brancas</span>, as linhas serão na cor preta.</p>
+                    <p>💡 <span className="font-bold text-[#4D1D54]">Em garrafas escuras</span>, as linhas serão na cor branca.</p>
                   </div>
                 </div>
               )}
 
               {/* Basic custom texts (Applies to all customizable items) */}
               <div className="space-y-6">
-                <span className="text-[10px] font-black uppercase tracking-widest text-[#4D1D54]">
-                  {product.isSuaHistoria ? '2. Identificação Principal' : 'Nomes e Detalhes da Customização'}
+                <span className="text-[10px] font-black uppercase tracking-widest text-[#4D1D54] block mb-2">
+                  {product.isSuaHistoria ? '2. Identificação Principal' : '2. Detalhes da Customização'}
                 </span>
 
                 <div className="space-y-4">
                   <div>
                     <div className="flex justify-between items-center mb-1.5">
-                      <label className="text-[10.5px] font-bold text-gray-600 block uppercase tracking-wide">Nome Completo do Cliente ou Dono do Mimo</label>
+                      <label className="text-[10.5px] font-bold text-gray-600 block uppercase tracking-wide">Informe os Nomes/Frases (uma por linha usando Enter)</label>
                       <span className="text-[10px] text-gray-400 font-bold bg-[#FAF7F8] px-2 py-0.5 rounded border border-stone-100">
-                        {customName.length}/24 carac.
+                        {customName.length}/500 carac.
                       </span>
                     </div>
-                    <input 
+                    <textarea 
                       id="nomePersonalizado"
-                      type="text" 
                       value={customName}
-                      onChange={(e) => setCustomName(e.target.value.slice(0, 24))}
-                      maxLength={24}
-                      placeholder="Ex: Jonas Santos Claro"
-                      className="w-full bg-white border border-gray-205 rounded-2xl p-4 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm"
+                      onChange={(e) => setCustomName(e.target.value.slice(0, 500))}
+                      maxLength={500}
+                      rows={5}
+                      placeholder='Ex:&#10;Copo 1: Andreza / "Seja forte..."&#10;Copo 2: Claudia / "Seja corajosa!"&#10;Copo 3: Luana / "Linda de si"'
+                      className="w-full bg-white border border-gray-200 rounded-2xl p-4 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all shadow-sm resize-y whitespace-pre-wrap"
                     />
                   </div>
 
@@ -832,7 +939,7 @@ export default function ProductDetails() {
                       value={customPhrase}
                       onChange={(e) => setCustomPhrase(e.target.value)}
                       placeholder="Ex: Desde 2023 ou Viva com Leveza"
-                      className="w-full bg-white border border-gray-205 rounded-2xl p-4 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all"
+                      className="w-full bg-white border border-gray-200 rounded-2xl p-4 text-xs font-bold outline-none focus:border-[#4D1D54] transition-all"
                     />
                   </div>
 
@@ -855,9 +962,9 @@ export default function ProductDetails() {
                             )}
                           >
                             <span 
-                              className="text-2xl font-normal block tracking-normal truncate w-full"
+                              className="text-3xl font-normal block tracking-normal h-12 flex items-center justify-center overflow-visible w-full py-1"
                               style={{ 
-                                fontFamily: font.family === 'Quicksand' ? '"Quicksand", sans-serif' : `"${font.family}", "Quicksand", sans-serif`,
+                                fontFamily: font.family === 'Quicksand' ? 'Quicksand, sans-serif' : `${font.family}, Quicksand, sans-serif`,
                                 textTransform: font.family === 'Quicksand' ? 'uppercase' : 'none'
                               }}
                             >
@@ -1181,6 +1288,276 @@ export default function ProductDetails() {
                     )}
                   </div>
                 </div>
+              )}
+
+              {/* SEÇÃO CARICATURA (OPCIONAL) */}
+              {(product.allowsCaricatura || product.category === 'canecas' || product.subcategory?.toUpperCase().includes('CARICATURA') || product.category === 'copos') && (
+                <div className="pt-8 border-t border-brand-gold/10 mt-6 space-y-6">
+                <div className="flex justify-center">
+                  <span className="bg-[#4D1D54] text-white text-[10px] font-black uppercase tracking-widest px-6 py-2.5 rounded-full shadow-md">
+                    🎨 CARICATURA (opcional)
+                  </span>
+                </div>
+
+                <div className="text-center space-y-1">
+                  <p className="text-[11px] font-bold text-gray-600 uppercase tracking-wide">
+                    Deseja adicionar uma caricatura?
+                  </p>
+                  <p className="text-stone-500 text-[10.5px] leading-relaxed max-w-sm mx-auto">
+                    Faça o upload da foto de uma pessoa ou pet que transformamos para você.
+                  </p>
+                  <div className="inline-block bg-brand-gold/10 text-[#8C6A3B] px-3 py-1 rounded-full text-xs font-black mt-1">
+                    💰 {hasCaricatura ? (caricaturasQtd === 2 ? formatPrice(price2images) : formatPrice(price1image)) : `A partir de ${formatPrice(price1image)}`}
+                  </div>
+                </div>
+
+                {/* Radio Options: Sim/Não */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHasCaricatura(false);
+                    }}
+                    className={cn(
+                      "px-4 py-4 rounded-xl text-xs font-black uppercase tracking-wider text-center transition-all border cursor-pointer flex flex-col items-center justify-center gap-1.5 shadow-sm",
+                      !hasCaricatura
+                        ? "bg-[#4D1D54] text-white border-[#4D1D54] shadow-md"
+                        : "bg-white text-gray-700 border-gray-200 hover:border-brand-gold/30"
+                    )}
+                  >
+                    <span>❌</span>
+                    <span>Não Adicionar</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHasCaricatura(true);
+                      setCaricaturasQtd(1);
+                    }}
+                    className={cn(
+                      "px-4 py-4 rounded-xl text-xs font-black uppercase tracking-wider text-center transition-all border cursor-pointer flex flex-col items-center justify-center gap-1.5 shadow-sm",
+                      hasCaricatura && caricaturasQtd === 1
+                        ? "bg-[#4D1D54] text-white border-[#4D1D54] shadow-md"
+                        : "bg-white text-gray-700 border-gray-200 hover:border-brand-gold/30"
+                    )}
+                  >
+                    <span>🕵️‍♂️ 1 IMAGEM</span>
+                    <span className="text-[9.5px] opacity-90">{formatPrice(price1image)}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setHasCaricatura(true);
+                      setCaricaturasQtd(2);
+                    }}
+                    className={cn(
+                      "px-4 py-4 rounded-xl text-xs font-black uppercase tracking-wider text-center transition-all border cursor-pointer flex flex-col items-center justify-center gap-1.5 shadow-sm",
+                      hasCaricatura && caricaturasQtd === 2
+                        ? "bg-[#4D1D54] text-white border-[#4D1D54] shadow-md"
+                        : "bg-white text-gray-700 border-gray-200 hover:border-brand-gold/30"
+                    )}
+                  >
+                    <span>🕵️‍♀️ 2 IMAGENS</span>
+                    <span className="text-[9.5px] opacity-90">{formatPrice(price2images)}</span>
+                  </button>
+                </div>
+
+                {hasCaricatura && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="space-y-6 pt-4 border-t border-dashed border-brand-gold/15"
+                  >
+                    {/* Estilo Options */}
+                    <div className="space-y-3">
+                      <div className="flex justify-center mb-1">
+                        <span className="text-[10px] font-black uppercase tracking-widest text-[#4D1D54] bg-[#FAF7F8] px-4 py-1.5 rounded-full border border-brand-gold/15 shadow-xs text-center">
+                          Escolha um estilo clicando em uma das opções abaixo:
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {['Realista', 'Desenho Cartoon', 'Charge', 'Flat'].map((style) => {
+                          const isStyleSelected = caricaturaEstilo === style;
+                          return (
+                            <button
+                              key={style}
+                              type="button"
+                              onClick={() => setCaricaturaEstilo(style)}
+                              className={cn(
+                                "py-3 rounded-xl text-[10.5px] font-black uppercase tracking-wider transition-all border cursor-pointer shadow-xs",
+                                isStyleSelected
+                                  ? "bg-brand-gold text-white border-brand-gold shadow"
+                                  : "bg-white text-gray-700 border-gray-200 hover:border-brand-gold/20"
+                              )}
+                            >
+                              🔘 {style}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Explaining Image Card */}
+                    <div className="bg-white p-4 rounded-2xl border border-brand-gold/15 shadow-sm space-y-4">
+                      <div className="text-center font-black text-[10px] uppercase tracking-widest text-[#8C6A3B]">
+                        Guia de Estilos Ilustrativo
+                      </div>
+                      
+                      {globalSettings?.caricatura_explaining_image ? (
+                        <div className="rounded-xl overflow-hidden border border-gray-100 flex justify-center bg-stone-50">
+                          <img
+                            src={globalSettings.caricatura_explaining_image}
+                            alt="Estilos de Caricatura"
+                            className="max-h-96 object-contain w-full"
+                            referrerPolicy="no-referrer"
+                          />
+                        </div>
+                      ) : (
+                        /* Premium fallback illustrative boxes styled like a magazine */
+                        <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                          <div className="p-3 bg-[#FAF7F8] rounded-xl border border-stone-100 text-center space-y-1.5">
+                            <div className="w-12 h-12 rounded-full bg-brand-gold/10 text-brand-gold mx-auto flex items-center justify-center text-lg">👩‍🎨</div>
+                            <h5 className="font-black text-[10px] uppercase text-[#4D1D54]">Realista</h5>
+                            <p className="text-[9.5px] text-gray-500 leading-normal font-medium">Traços suaves e detalhados, mantendo a aparência natural com um toque artístico.</p>
+                          </div>
+                          <div className="p-3 bg-[#FAF7F8] rounded-xl border border-stone-100 text-center space-y-1.5">
+                            <div className="w-12 h-12 rounded-full bg-brand-gold/10 text-brand-gold mx-auto flex items-center justify-center text-lg">🌸</div>
+                            <h5 className="font-black text-[10px] uppercase text-[#4D1D54]">Desenho Cartoon</h5>
+                            <p className="text-[9.5px] text-gray-500 leading-normal font-medium">Visual divertido, colorido e inspirado em desenhos animados modernos.</p>
+                          </div>
+                          <div className="p-3 bg-[#FAF7F8] rounded-xl border border-stone-100 text-center space-y-1.5">
+                            <div className="w-12 h-12 rounded-full bg-brand-gold/10 text-brand-gold mx-auto flex items-center justify-center text-lg">🎭</div>
+                            <h5 className="font-black text-[10px] uppercase text-[#4D1D54]">Charge</h5>
+                            <p className="text-[9.5px] text-gray-500 leading-normal font-medium">Estilo humorístico com expressões e características do rosto mais exageradas.</p>
+                          </div>
+                          <div className="p-3 bg-[#FAF7F8] rounded-xl border border-stone-100 text-center space-y-1.5">
+                            <div className="w-12 h-12 rounded-full bg-[#4D1D54]/5 text-[#4D1D54] mx-auto flex items-center justify-center text-lg">🐈</div>
+                            <h5 className="font-black text-[10px] uppercase text-[#4D1D54]">Flat</h5>
+                            <p className="text-[9.5px] text-gray-500 leading-normal font-medium">Arte minimalista, com cores chapadas, sem contornos faciais, romântica e elegante.</p>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Image Upload Files inputs */}
+                    <div className="space-y-4">
+                      {/* FILE 1 */}
+                      <div className="bg-[#FAF7F8]/40 p-4 rounded-2xl border border-brand-gold/10 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div className="space-y-0.5">
+                          <label className="text-[10px] font-black uppercase text-[#8C6A3B] block">Foto da Caricatura 01</label>
+                          <p className="text-[9.5px] text-gray-400 font-medium">Faça o upload da foto do rosto do primeiro personagem ou pet.</p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <label className="bg-brand-primary text-white hover:opacity-90 px-4 py-2.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs shrink-0">
+                            UPLOAD
+                            <input
+                              type="file"
+                              accept="image/*"
+                              onChange={handleFileUpload}
+                              className="hidden"
+                            />
+                          </label>
+                          {caricaturaFile ? (
+                            <div className="flex items-center gap-2">
+                              <span className="text-[9.5px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded flex items-center gap-1 border border-green-100">
+                                ENVIADO ✓
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => setCaricaturaFile(null)}
+                                className="text-red-500 hover:text-red-700 text-xs font-bold font-mono transition-colors"
+                                title="Remover"
+                              >
+                                [x]
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-[9.5px] text-[#4D1D54] font-bold bg-[#FAF7F8] px-2.5 py-1 rounded border border-brand-pink-light">
+                              PENDENTE
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* FILE 2 (Only if 2 caricatures selected) */}
+                      {caricaturasQtd === 2 && (
+                        <div className="bg-[#FAF7F8]/40 p-4 rounded-2xl border border-brand-gold/10 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="space-y-0.5">
+                            <label className="text-[10px] font-black uppercase text-[#8C6A3B] block">Foto da Caricatura 02</label>
+                            <p className="text-[9.5px] text-gray-400 font-medium">Faça o upload da foto do rosto do segundo personagem ou pet.</p>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <label className="bg-brand-primary text-white hover:opacity-90 px-4 py-2.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all cursor-pointer shadow-xs shrink-0">
+                              UPLOAD
+                              <input
+                                type="file"
+                                accept="image/*"
+                                onChange={handleFileUpload2}
+                                className="hidden"
+                              />
+                            </label>
+                            {caricaturaFile2 ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-[9.5px] font-bold text-green-600 bg-green-50 px-2 py-1 rounded flex items-center gap-1 border border-green-100">
+                                  ENVIADO ✓
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setCaricaturaFile2(null)}
+                                  className="text-red-500 hover:text-red-700 text-xs font-bold font-mono transition-colors"
+                                  title="Remover"
+                                >
+                                  [x]
+                                </button>
+                              </div>
+                            ) : (
+                              <span className="text-[9.5px] text-[#4D1D54] font-bold bg-[#FAF7F8] px-2.5 py-1 rounded border border-brand-pink-light">
+                                PENDENTE
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Previews of uploaded images */}
+                    {(caricaturaFile || caricaturaFile2) && (
+                      <div className="grid grid-cols-2 gap-4 bg-zinc-50/50 p-4 rounded-2xl border border-zinc-100">
+                        {caricaturaFile && (
+                          <div className="text-center space-y-1">
+                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Foto 1</span>
+                            <div className="h-28 w-full rounded-lg overflow-hidden border border-zinc-200 bg-white p-1 flex items-center justify-center shadow-xs">
+                              <img src={caricaturaFile} alt="Preview 1" className="max-h-full max-w-full object-contain rounded animate-fade-in" />
+                            </div>
+                          </div>
+                        )}
+                        {caricaturaFile2 && (
+                          <div className="text-center space-y-1">
+                            <span className="text-[9px] font-black text-gray-400 uppercase tracking-wider">Foto 2</span>
+                            <div className="h-28 w-full rounded-lg overflow-hidden border border-zinc-200 bg-white p-1 flex items-center justify-center shadow-xs">
+                              <img src={caricaturaFile2} alt="Preview 2" className="max-h-full max-w-full object-contain rounded animate-fade-in" />
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Observações Section */}
+                    <div className="p-4 bg-brand-pink-medium/30 rounded-2xl border border-brand-primary/10 space-y-2">
+                      <span className="text-[10px] font-black uppercase tracking-wider text-[#4D1D54] flex items-center gap-1.5">
+                        ⚠️ Observação importante:
+                      </span>
+                      <ul className="text-[10px] text-stone-600 font-medium space-y-1 pl-4 list-disc leading-relaxed">
+                        <li>Não alteramos cor de roupa, cor de cabelo, corpo, pose, postura ou realizamos reconstrução da imagem.</li>
+                        <li>A caricatura é feita exatamente como na foto enviada.</li>
+                        <li>Por isso, envie uma imagem com boa qualidade, sem objetos cobrindo o rosto e sem cortes na foto.</li>
+                      </ul>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
               )}
             </div>
           ) : null}

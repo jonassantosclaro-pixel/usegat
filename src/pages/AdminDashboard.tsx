@@ -3,7 +3,7 @@ import { collection, getDocs, addDoc, deleteDoc, doc, updateDoc, onSnapshot, set
 import { db, handleFirestoreError, OperationType } from '@/src/lib/firebase';
 import { useAuth } from '@/src/lib/AuthContext';
 import { Link } from 'react-router-dom';
-import { Plus, Trash2, Edit3, Package, Users, ShoppingCart as OrderIcon, Database, ArrowLeft, Check, Search, RefreshCw, Ticket, Settings as SettingsIcon, Layers, Tags } from 'lucide-react';
+import { Plus, Trash2, Edit3, Package, Users, ShoppingCart as OrderIcon, Database, ArrowLeft, Check, Search, RefreshCw, Ticket, Settings as SettingsIcon, Layers, Tags, Image as ImageIcon } from 'lucide-react';
 import { formatPrice } from '@/src/lib/utils';
 import { FALLBACK_PRODUCTS } from '@/src/lib/productsData';
 
@@ -67,6 +67,11 @@ export default function AdminDashboard() {
     about_title: '',
     about_text: '',
     about_image: '',
+
+    // Caricatura Configs
+    caricatura_explaining_image: '',
+    caricatura_price_1: '19.90',
+    caricatura_price_2: '39.80',
 
     // Como personalizar seu pedido
     custom_step_1_title: '',
@@ -146,6 +151,7 @@ export default function AdminDashboard() {
     hasNameAndSurname: false,
     hasNameAndSurnameSemAoVivo: false,
     isSuaHistoria: false,
+    allowsCaricatura: false,
     sku: '',
     detailedDescription: '',
     stock: 0,
@@ -894,6 +900,7 @@ export default function AdminDashboard() {
       hasNameAndSurname: product.hasNameAndSurname || false,
       hasNameAndSurnameSemAoVivo: product.hasNameAndSurnameSemAoVivo || false,
       isSuaHistoria: product.isSuaHistoria || false,
+      allowsCaricatura: product.allowsCaricatura || false,
       sku: product.sku || '',
       detailedDescription: product.detailedDescription || '',
       stock: product.stock || 0,
@@ -1085,9 +1092,12 @@ export default function AdminDashboard() {
                   hasNameAndSurname: false,
                   hasNameAndSurnameSemAoVivo: false,
                   isSuaHistoria: false,
+                  allowsCaricatura: false,
                   sku: '',
                   detailedDescription: '',
-                  stock: 0
+                  stock: 0,
+                  imageUrls: [] as string[],
+                  variations: []
                 });
                 setShowAddModal(true);
               }}
@@ -1129,9 +1139,12 @@ export default function AdminDashboard() {
                   hasNameAndSurname: false,
                   hasNameAndSurnameSemAoVivo: false,
                   isSuaHistoria: false,
+                  allowsCaricatura: false,
                   sku: '',
                   detailedDescription: '',
-                  stock: 0
+                  stock: 0,
+                  imageUrls: [] as string[],
+                  variations: []
                 });
                 setShowAddModal(true);
               }}
@@ -1162,7 +1175,10 @@ export default function AdminDashboard() {
                     </td>
                     <td className="py-6">
                       <p className="font-bold text-sm text-brand-black">{p.name}</p>
-                      {p.customizable && <span className="text-[7px] font-black uppercase tracking-widest text-brand-pink-strong mt-1 block">Personalizável</span>}
+                      <div className="flex gap-1.5 flex-wrap items-center">
+                        {p.customizable && <span className="text-[7px] font-black uppercase tracking-widest text-brand-pink-strong mt-1">Personalizável</span>}
+                        {p.allowsCaricatura && <span className="text-[7px] font-black uppercase tracking-widest text-[#4D1D54] mt-1 font-bold">🎨 Caricatura</span>}
+                      </div>
                     </td>
                     <td className="py-6">
                       <span className="text-[10px] font-mono font-black text-brand-primary">{p.sku || '-'}</span>
@@ -1239,7 +1255,10 @@ export default function AdminDashboard() {
                         </td>
                         <td className="py-6">
                           <p className="font-bold text-sm text-brand-black">{p.name}</p>
-                          {p.customizable && <span className="text-[7px] font-black uppercase tracking-widest text-[#4D1D54] mt-1 block">★ Personalizável</span>}
+                          <div className="flex gap-1.5 flex-wrap items-center">
+                            {p.customizable && <span className="text-[7px] font-black uppercase tracking-widest text-[#4D1D54] mt-1">★ Personalizável</span>}
+                            {p.allowsCaricatura && <span className="text-[7px] font-black uppercase tracking-widest text-[#4D1D54] mt-1 font-bold">🎨 Caricatura</span>}
+                          </div>
                         </td>
                         <td className="py-6">
                           <span className="text-[10px] font-mono font-black text-brand-pink-strong">{p.sku || '-'}</span>
@@ -2354,6 +2373,140 @@ export default function AdminDashboard() {
               })}
             </div>
 
+            {/* ACCORDION 12: CONFIGURAÇÃO DE CARICATURAS (OPCIONAL) */}
+            <div className="border border-brand-gold/15 rounded-3xl p-6 md:p-8 space-y-6 bg-[#FAF7F8]/40 shadow-sm">
+              <div>
+                <h3 className="text-sm font-black uppercase tracking-widest text-[#8C6A3B] flex items-center gap-2 border-b border-brand-pink-medium/10 pb-4 mb-2">
+                  🎨 12. Configuração de Caricaturas (Explicação & Preços)
+                </h3>
+                <p className="text-xs text-brand-gray leading-relaxed">
+                  Gerencie a imagem explicativa dos estilos de caricatura (Realista, Cartoon, Charge, Flat) e os valores cobrados por cada opção no formulário opcional do produto.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 bg-white p-6 rounded-2xl border border-brand-gold/10">
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-[10px] font-black uppercase tracking-widest text-[#4D1D54] mb-1.5 block">
+                      Imagem Explicativa de Estilos
+                    </label>
+                    <p className="text-[10px] text-gray-500 mb-3 leading-normal">
+                      Insira uma URL ou faça upload de uma foto que mostra aos seus clientes os estilos disponíveis (Realista, Cartoon, Charge, Flat).
+                    </p>
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        className="flex-grow bg-[#FAF7F8] border border-brand-pink-light rounded-xl p-3 text-xs font-mono outline-none"
+                        value={settings.caricatura_explaining_image || ''}
+                        onChange={(e) => setSettings({ ...settings, caricatura_explaining_image: e.target.value })}
+                        placeholder="Ex: https://firebasestorage.googleapis.com/..."
+                      />
+                      <label className="bg-[#4D1D54] text-white hover:opacity-90 px-4 py-3 rounded-xl text-[10px] font-black uppercase tracking-widest transition-all cursor-pointer shadow-sm flex items-center shrink-0">
+                        📁 Enviar Imagem
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (!file) return;
+                            if (file.size > 5 * 1024 * 1024) {
+                              alert("Escolha uma imagem menor de 5MB.");
+                              return;
+                            }
+                            const reader = new FileReader();
+                            reader.onload = (uploadEvt) => {
+                              const base64 = uploadEvt.target?.result as string;
+                              const img = new Image();
+                              img.src = base64;
+                              img.onload = () => {
+                                const canvas = document.createElement('canvas');
+                                let width = img.width;
+                                let height = img.height;
+                                const MAX = 1200;
+                                if (width > MAX || height > MAX) {
+                                  if (width > height) {
+                                    height = Math.round((height * MAX) / width);
+                                    width = MAX;
+                                  } else {
+                                    width = Math.round((width * MAX) / height);
+                                    height = MAX;
+                                  }
+                                }
+                                canvas.width = width;
+                                canvas.height = height;
+                                const ctx = canvas.getContext('2d');
+                                if (ctx) {
+                                  ctx.drawImage(img, 0, 0, width, height);
+                                  const optBase64 = canvas.toDataURL('image/jpeg', 0.82);
+                                  fetch('/api/upload', {
+                                    method: 'POST',
+                                    headers: { 'Content-Type': 'application/json' },
+                                    body: JSON.stringify({ image: optBase64 })
+                                  })
+                                  .then(res => res.json())
+                                  .then(data => {
+                                    setSettings(prev => ({ ...prev, caricatura_explaining_image: data.imageUrl }));
+                                  })
+                                  .catch(err => {
+                                    console.error("Upload erro, usando base64:", err);
+                                    setSettings(prev => ({ ...prev, caricatura_explaining_image: optBase64 }));
+                                  });
+                                }
+                              };
+                            };
+                            reader.readAsDataURL(file);
+                          }}
+                        />
+                      </label>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4 pt-2">
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-[#8C6A3B] mb-1 block">Preço 1 Imagem (R$)</label>
+                      <input
+                        type="text"
+                        className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-xl p-3 text-xs font-bold"
+                        value={settings.caricatura_price_1 || '19.90'}
+                        onChange={(e) => setSettings({ ...settings, caricatura_price_1: e.target.value })}
+                        placeholder="19.90"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[9px] font-black uppercase text-[#8C6A3B] mb-1 block">Preço 2 Imagens (R$)</label>
+                      <input
+                        type="text"
+                        className="w-full bg-[#FAF7F8] border border-brand-pink-light rounded-xl p-3 text-xs font-bold"
+                        value={settings.caricatura_price_2 || '39.80'}
+                        onChange={(e) => setSettings({ ...settings, caricatura_price_2: e.target.value })}
+                        placeholder="39.80"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="border border-dashed border-[#4D1D54]/20 p-4 rounded-xl flex flex-col justify-center items-center bg-white">
+                  <span className="text-[10px] font-black uppercase tracking-widest text-[#8C6A3B] mb-3">Prévia da Explicação</span>
+                  {settings.caricatura_explaining_image ? (
+                    <div className="max-w-full max-h-56 overflow-hidden rounded-lg border border-stone-200 shadow-sm bg-white p-1">
+                      <img
+                        src={settings.caricatura_explaining_image}
+                        alt="Prévia de Caricaturas"
+                        className="max-w-full max-h-48 object-contain"
+                        referrerPolicy="no-referrer"
+                      />
+                    </div>
+                  ) : (
+                    <div className="text-center p-6 text-stone-400">
+                      <ImageIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                      <p className="text-[10px] font-semibold">Nenhuma imagem carregada. Será usado o infográfico ou layout padrão do site.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             <button
               type="submit"
               className="w-full bg-black hover:bg-zinc-800 text-white py-6 rounded-full font-black uppercase tracking-widest text-xs shadow-xl transition-all transform hover:scale-[1.02] cursor-pointer flex items-center justify-center gap-2"
@@ -3111,6 +3264,17 @@ export default function AdminDashboard() {
                         className="w-5 h-5 accent-brand-red"
                       />
                       <label htmlFor="isSuaHistoria" className="text-[10px] font-black uppercase tracking-widest">Sua História</label>
+                    </div>
+
+                    <div className="flex items-center gap-2 border-l-2 border-brand-gray pl-4">
+                      <input 
+                        type="checkbox" 
+                        id="allowsCaricatura"
+                        checked={(newProduct as any).allowsCaricatura || false}
+                        onChange={(e) => setNewProduct({...newProduct, allowsCaricatura: e.target.checked})}
+                        className="w-5 h-5 accent-brand-red"
+                      />
+                      <label htmlFor="allowsCaricatura" className="text-[10px] font-black uppercase tracking-widest text-[#4D1D54] font-black">Caricatura</label>
                     </div>
                   </>
                 )}
